@@ -1,0 +1,12 @@
+numpy
+pandas
+matplotlib
+scipy
+lmfit
+pyvista
+pyvistaqt
+PyQt6
+opencv-python
+scikit-image
+openpyxl
+huggingface-hub

@@ -1,0 +1,29 @@
+# Virtual Environment
+.venv/
+venv/
+env/
+ENV/
+
+# PyTorch Model Checkpoints (very large files, must not be pushed to GitHub)
+*.pt
+*.pth
+sam2.1_hiera_large.pt
+sam3.1_multiplex.pt
+
+# Python compiled files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Exported results and data
+*.xlsx
+* parametrai.xlsx
+* 3D.png
+*3D.png
+.ipynb_checkpoints/
+
+# Operating System specific files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
