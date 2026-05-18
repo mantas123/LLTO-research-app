@@ -1,5 +1,5 @@
 # ⚡ DRT Analizė
-### Atsipalaidavimo Trukmių Pasiskirstymo Modulis (`LLTO research app`)
+### Atsipalaidavimo Trukmių Pasiskirstymo Modulis (`CeraMIS`)
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg?logo=python&logoColor=white)](https://www.python.org/)
 [![dearEIS Core](https://img.shields.io/badge/dearEIS-Integration-red.svg)](https://github.com/kbknudsen/PyEIS)

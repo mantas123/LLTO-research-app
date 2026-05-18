@@ -2,4 +2,4 @@
 chcp 65001 > nul
 title CeraMIS
 echo Paleidziama CeraMIS...
-start "" ".venv\Scripts\pythonw.exe" "LLTO research app.py"
+start "" ".venv\Scripts\pythonw.exe" "main CeraMIS.py"

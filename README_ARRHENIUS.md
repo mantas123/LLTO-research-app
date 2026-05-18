@@ -1,5 +1,5 @@
 # 🌡️ Arenijaus Analizė
-### Aktyvacijos Energijos ir Joninio Laidumo Modulis (`LLTO research app`)
+### Aktyvacijos Energijos ir Joninio Laidumo Modulis (`CeraMIS`)
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg?logo=python&logoColor=white)](https://www.python.org/)
 [![dearEIS Core](https://img.shields.io/badge/dearEIS-Integration-red.svg)](https://github.com/kbknudsen/PyEIS)

@@ -49,7 +49,7 @@ echo [PALEIDIMO FAILAS] Kuriama 'run.bat' nuoroda...
 echo @echo off
 echo title CeraMIS
 echo echo Paleidziama CeraMIS...
-echo start "" ".venv\Scripts\pythonw.exe" "LLTO research app.py"
+echo start "" ".venv\Scripts\pythonw.exe" "main CeraMIS.py"
 ) > run.bat
 
 echo [SEKME] 'run.bat' failas sekmingai sukurtas!

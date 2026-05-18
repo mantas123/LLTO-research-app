@@ -1,4 +1,8 @@
-# 💎 LLTO Research App
+<div align="center">
+<img src="logo.png" width="300" alt="CeraMIS Logo">
+
+# 💎 CeraMIS
+</div>
 ### Visapusiška Kietųjų Elektrolitų Charakterizavimo ir Mikromorfologinės Analizės Sistema
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg?logo=python&logoColor=white)](https://www.python.org/)
@@ -9,7 +13,7 @@
 
 ---
 
-**LLTO Research App** – tai specializuota mokslinė programinė įranga, sukurta **Manto Jono Marcinkevičiaus**, skirta Ličio Lantano Titanato (**LLTO**) kietųjų elektrolitų kompleksinei impedanso spektroskopijos (EIS), relaksacijos trukmės pasiskirstymo (DRT), struktūrinės 3D perovskičių simuliacijos ir SEM mikrostruktūros dirbtinio intelekto analizei.
+**CeraMIS** – tai specializuota mokslinė programinė įranga, sukurta **Manto Jono Marcinkevičiaus**, skirta Ličio Lantano Titanato (**LLTO**) kietųjų elektrolitų kompleksinei impedanso spektroskopijos (EIS), relaksacijos trukmės pasiskirstymo (DRT), struktūrinės 3D perovskičių simuliacijos ir SEM mikrostruktūros dirbtinio intelekto analizei.
 
 Ši programa apjungia pažangiausius mašininio mokymosi algoritmus (Meta SAM 3.1) su klasikiniais elektrocheminiais ir kristalografiniais modeliais į vientisą, vartotojui patogią grafinę aplinką.
 
@@ -99,7 +103,7 @@ Programai paleisti reikalinga **Python 3.11+** versija ir CUDA palaikymas vaizdo
 ### 1. Virtualios aplinkos paruošimas
 ```powershell
 # Klonuokite arba nukopijuokite projektą į savo aplanką
-cd pyEIS
+cd CeraMIS
 
 # Sukurkite virtualią aplinką
 python -m venv .venv
@@ -126,7 +130,7 @@ Norint naudoti SEM AI segmentaciją, į projekto šakninį katalogą būtina įk
 Aktyvavę virtualią aplinką, paleiskite pagrindinį failą:
 
 ```powershell
-python "LLTO research app.py"
+python "main CeraMIS.py"
 ```
 
 > [!NOTE]
