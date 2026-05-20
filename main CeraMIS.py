@@ -44,6 +44,15 @@ from matplotlib.widgets import RectangleSelector
 from scipy.integrate import simpson
 from scipy.signal import find_peaks
 
+# --- KONFIGŪRACIJA ---
+from language_driver import _, get_config_val, get_config_bool, set_config_val
+
+FILE_PATH = get_config_val('default_spectrum_file', r"C:\Users\bigma\OneDrive\BAKALAURAS fiz\4 KURSAS\Bakalauras\rezultatai\LLTO 145K - 1060K temperatūros 1Hz - 9Ghz spektre.xlsx")
+AUTHOR = get_config_val('author', "Mantas Jonas Marcinkevičius")
+DEFAULT_PROJECT_PATH = get_config_val('default_deareis_project', r"C:/Users/bigma/OneDrive/Bakalauras/rezultatai/dearEIS LLTO nuo 145k iki 1060K.json")
+EPSILON_0 = 8.85418782e-12 
+EPS_0_SI = 8.854187817e-14  # F/cm
+
 GRAPH_TYPES = {
     "Z' vs f": "Z_real_f",
     "-Z'' vs f": "Z_imag_f",
@@ -52,25 +61,18 @@ GRAPH_TYPES = {
     "σ' vs f": "sigma_f",
     "M'' vs f": "M_imag_f",
     "tan δ vs f": "tan_delta_f",
-    "Norm. Z'' ir M'' vs f": "norm_z_m_f",
+    _("Norm. Z'' ir M'' vs f", "Norm. Z'' and M'' vs f"): "norm_z_m_f",
     "Z''/Z''max vs f": "norm_z_f",
     "M''/M''max vs f": "norm_m_f",
-    "Summerfield skalavimas": "summerfield",
+    _("Summerfield skalavimas", "Summerfield scaling"): "summerfield",
     "Pseudo-DRT (-dZ'/dlogf)": "pseudo_drt",
-    "Naikvisto grafikas": "nyquist",
-    "Pilnutinė varža (|Z|) vs f": "abs_Z_f",
-    "Fazės kampas (-Θ) vs f": "phase_f",
-    "Z' ir -Z'' vs f": "z_real_imag_f",
-    "Bodė grafikas (|Z| ir -Θ)": "bode_dual",
-    "Cole-Cole grafikas (ε' vs ε'')": "cole_cole",
+    _("Naikvisto grafikas", "Nyquist Plot"): "nyquist",
+    _("Pilnutinė varža (|Z|) vs f", "Impedance Spectroscopy (|Z|) vs f"): "abs_Z_f",
+    _("Fazės kampas (-Θ) vs f", "Phase Angle (-Θ) vs f"): "phase_f",
+    _("Z' ir -Z'' vs f", "Z' and -Z'' vs f"): "z_real_imag_f",
+    _("Bodė grafikas (|Z| ir -Θ)", "Bode Plot (|Z| and -Θ)"): "bode_dual",
+    _("Cole-Cole grafikas (ε' vs ε'')", "Cole-Cole Plot (ε' vs ε'')"): "cole_cole",
 }
-
-# --- KONFIGŪRACIJA ---
-FILE_PATH = r"C:\Users\bigma\OneDrive\BAKALAURAS fiz\4 KURSAS\Bakalauras\rezultatai\LLTO 145K - 1060K temperatūros 1Hz - 9Ghz spektre.xlsx"
-AUTHOR = "Mantas Jonas Marcinkevičius"
-DEFAULT_PROJECT_PATH = r"C:/Users/bigma/OneDrive/BAKALAURAS fiz/4 KURSAS/Bakalauras/rezultatai/dearEIS LLTO nuo 145k iki 1060K.json"
-EPSILON_0 = 8.85418782e-12 
-EPS_0_SI = 8.854187817e-14  # F/cm
 
 # --- TERMINĖS PALETĖS (Custom Thermal Colormaps - Clipped to avoid black/white) ---
 IRONBOW_COLORS = ['#100060', '#500080', '#b03060', '#e07040', '#f0b000']
@@ -88,149 +90,7 @@ def to_sci_unicode(value, decimals=2):
     unicode_exp = "".join(superscripts.get(c, c) for c in str(exp_int))
     return f"{base}·10{unicode_exp}"
 
-# ─── ARENIJAUS PAGALBINĖS FUNKCIJOS ─────────────────────────────────────────
-
-def _find_element_keys(parameters: dict, element_type: str):
-    pattern = re.compile(r"^" + re.escape(element_type) + r"_\d+$", re.IGNORECASE)
-    return sorted([k for k in parameters.keys() if pattern.match(k)])
-
-def _extract_element_params(parameters: dict, element_key: str):
-    result = {}
-    if element_key in parameters:
-        for pk, pdata in parameters[element_key].items():
-            val = pdata.get("value", float("nan"))
-            err = pdata.get("stderr", float("nan"))
-            result[pk] = (val, float("nan") if err is None else err)
-    return result
-
-def calc_c_eff(R, Q, n):
-    if any(isnan(x) or isinf(x) for x in [R, Q, n]) or R <= 0 or Q <= 0 or n <= 0:
-        return float("nan")
-    try:
-        return (Q * R ** (1 - n)) ** (1 / n)
-    except Exception:
-        return float("nan")
-
-def calc_eps_r(C_eff, L_cm, A_cm2):
-    if isnan(C_eff) or C_eff <= 0:
-        return float("nan")
-    return C_eff * L_cm / (EPS_0_SI * A_cm2)
-
-def calc_sigma(R_total, L_cm, A_cm2):
-    if isnan(R_total) or R_total <= 0:
-        return float("nan")
-    return L_cm / (R_total * A_cm2)
-
-def parse_temp_arr(label: str) -> float:
-    m = re.search(r"(\d+(?:\.\d+)?)\s*[kK](?!\w)", label)
-    if m: return float(m.group(1))
-    m = re.search(r"(\d+(?:\.\d+)?)\s*(?:°C|degC|C\b)", label)
-    if m: return float(m.group(1)) + 273.15
-    m = re.search(r"(\d{3,4}(?:\.\d+)?)", label)
-    if m:
-        val = float(m.group(1))
-        if 100 <= val <= 2000: return val
-    return float("nan")
-
-def load_dear_project(path: str) -> dict:
-    with open(path, "r", encoding="utf-8") as f:
-        return json.load(f)
-
-def get_all_r_keys(project: dict) -> list:
-    keys = set()
-    for fit_list in project.get("fits", {}).values():
-        for fit in fit_list:
-            for rk in _find_element_keys(fit.get("parameters", {}), "R"):
-                keys.add(rk)
-    return sorted(keys)
-
-def get_fit_labels(project: dict) -> dict:
-    result = {}
-    ds_by_uuid = {ds["uuid"]: ds.get("label", ds["uuid"])
-                  for ds in project.get("data_sets", [])}
-    for uuid, fit_list in project.get("fits", {}).items():
-        ds_label = ds_by_uuid.get(uuid, uuid)
-        entries = []
-        for i, fit in enumerate(fit_list):
-            cdc = fit.get("circuit_description_code", "?")
-            label = fit.get("label", "") or f"Fit #{i+1}"
-            entries.append((i, f"#{i+1} [{cdc}] {label}"))
-        if entries:
-            result[uuid] = entries
-    return result
-
-def extract_fit_data(project: dict, L_cm: float, A_cm2: float,
-                     r_keys_selected: list, fit_index: str = "last") -> pd.DataFrame:
-    data_sets = project.get("data_sets", [])
-    fits_by_data = project.get("fits", {})
-    rows = []
-    for ds in data_sets:
-        ds_uuid = ds.get("uuid", "")
-        ds_label = ds.get("label", "")
-        T_K = parse_temp_arr(ds_label)
-        fit_list = fits_by_data.get(ds_uuid, [])
-        if not fit_list: continue
-        
-        if fit_index == "last": fit = fit_list[0]
-        elif fit_index == "first": fit = fit_list[-1]
-        else:
-            try:
-                idx = int(fit_index)
-                fit = fit_list[min(idx, len(fit_list) - 1)]
-            except (ValueError, IndexError):
-                fit = fit_list[0]
-
-        parameters = fit.get("parameters", {})
-        R_vals, R_errs = [], []
-        for rk in r_keys_selected:
-            params = _extract_element_params(parameters, rk)
-            R_val, R_err = params.get("R", (float("nan"), float("nan")))
-            R_vals.append(R_val)
-            R_errs.append(R_err)
-
-        if R_vals and not any(isnan(v) for v in R_vals):
-            R_total = sum(R_vals)
-            R_total_err = sqrt(sum(e**2 for e in R_errs if not isnan(e)))
-        else:
-            R_total = R_total_err = float("nan")
-
-        sigma = calc_sigma(R_total, L_cm, A_cm2)
-        sigma_err = (sigma * (R_total_err / R_total)
-                     if not isnan(sigma) and not isnan(R_total_err) and R_total > 0
-                     else float("nan"))
-        ln_sT = (log(sigma * T_K) if not isnan(sigma) and sigma > 0 and T_K > 0
-                 else float("nan"))
-        ln_sT_err = (sigma_err / sigma if not isnan(sigma) and sigma > 0 and not isnan(sigma_err)
-                     else float("nan"))
-
-        row = {
-            "Dataset": ds_label, "T_K": T_K, "ds_uuid": ds_uuid,
-            "1000/T": 1000.0 / T_K if T_K > 0 else float("nan"),
-            "R_total (Ohm)": R_total, "R_total_err (Ohm)": R_total_err,
-            "Sigma (S/cm)": sigma, "Sigma_err (S/cm)": sigma_err,
-            "ln(Sigma*T)": ln_sT, "ln_err": ln_sT_err,
-        }
-        for rk, R_val, R_err in zip(r_keys_selected, R_vals, R_errs):
-            row[f"{rk}_R (Ohm)"] = R_val
-            row[f"{rk}_R_err (Ohm)"] = R_err
-
-        q_keys = _find_element_keys(parameters, "Q")
-        for i, qk in enumerate(q_keys, 1):
-            q_params = _extract_element_params(parameters, qk)
-            Q_val, Q_err = q_params.get("Q", (float("nan"), float("nan")))
-            n_val, n_err = q_params.get("n", (float("nan"), float("nan")))
-            row[f"{qk}_Q"] = Q_val
-            row[f"{qk}_n"] = n_val
-            matched_R = R_vals[i-1] if i <= len(R_vals) else float("nan")
-            C_eff = calc_c_eff(matched_R, Q_val, n_val)
-            row[f"{qk}_C_eff (F)"] = C_eff
-            row[f"{qk}_eps_r"] = calc_eps_r(C_eff, L_cm, A_cm2)
-        rows.append(row)
-
-    if not rows: return pd.DataFrame()
-    df = pd.DataFrame(rows)
-    df = df.sort_values("T_K").reset_index(drop=True)
-    return df
+# (Migrated Arrhenius helper functions to arrhenius_module.py)
 
 def format_comma(value, decimals=2, add_degree=False):
     """Konvertuoja float į dešimtainį su kableliu."""
@@ -266,9 +126,14 @@ def parse_freq_with_units(s):
 class CeraMISApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("CeraMIS - Keramikos Mikrostruktūros ir Impedanso Sistema")
-        self.root.geometry("1300x1550")
-        self.center_window(self.root, 1300, 1550)
+        self.gui_scale = float(get_config_val('gui_scale', '1.0'))
+        self.root.title(_('app_title', "CeraMIS - Ceramic Microstructure and Impedance System"))
+        
+        start_w = int(1300 * self.gui_scale)
+        start_h = int(1300 * self.gui_scale)
+        self.root.geometry(f"{start_w}x{start_h}")
+        self.center_window(self.root, start_w, start_h)
+        
         
         try:
             if os.path.exists("logo.ico"):
@@ -297,14 +162,16 @@ class CeraMISApp:
         self.tab_sem = ttk.Frame(self.notebook)
         self.tab_sem_stats = ttk.Frame(self.notebook)
         self.tab_crystal = ttk.Frame(self.notebook)
-        self.notebook.add(self.tab_main, text="EIS Analizė")
-        self.notebook.add(self.tab_arc, text="Lanko pločio analizė")
-        self.notebook.add(self.tab_arr, text="Arenijaus analizė")
-        self.notebook.add(self.tab_drt, text="DRT Analizė")
-        self.notebook.add(self.tab_fit, text="Modeliavimas")
-        self.notebook.add(self.tab_sem, text="SEM Analizė (AI)")
-        self.notebook.add(self.tab_sem_stats, text="📊 SEM Statistika")
-        self.notebook.add(self.tab_crystal, text="💎 3D Kristalas")
+        self.tab_settings = ttk.Frame(self.notebook)
+        self.notebook.add(self.tab_main, text=_('tab_eis', "EIS Analysis"))
+        self.notebook.add(self.tab_arc, text=_('tab_arc', "Arc Width Analysis"))
+        self.notebook.add(self.tab_arr, text=_('tab_arr', "Arrhenius Analysis"))
+        self.notebook.add(self.tab_drt, text=_('tab_drt', "DRT Analysis"))
+        self.notebook.add(self.tab_fit, text=_('tab_fit', "Circuit Modeling"))
+        self.notebook.add(self.tab_sem, text=_('tab_sem', "SEM AI Analysis"))
+        self.notebook.add(self.tab_sem_stats, text=_('tab_sem_stats', "📊 SEM Statistics"))
+        self.notebook.add(self.tab_crystal, text=_('tab_crystal', "💎 3D Crystal"))
+        self.notebook.add(self.tab_settings, text=_('tab_settings', "⚙️ Settings"))
 
         self.frequencies, self.data_dict, self.vars = [], {}, {}
         self.t_min_var = tk.StringVar(value="")
@@ -314,18 +181,20 @@ class CeraMISApp:
         
         self.f_min_var = tk.StringVar(value="")
         self.f_max_var = tk.StringVar(value="")
+        self.f_min_var.trace_add("write", lambda *args: self.save_selected_freqs())
+        self.f_max_var.trace_add("write", lambda *args: self.save_selected_freqs())
         
-        # Bandinio geometrija (numatytoji pagal naudotoją: 1.5 mm ir 0.51 mm²)
-        self.thickness_var = tk.StringVar(value="1.5")
-        self.area_var = tk.StringVar(value="0.51")
-        self.is_normalized_var = tk.BooleanVar(value=True)
+        # Bandinio geometrija
+        self.thickness_var = tk.StringVar(value=get_config_val('default_thickness', '1.5'))
+        self.area_var = tk.StringVar(value=get_config_val('default_area', '0.51'))
+        self.is_normalized_var = tk.BooleanVar(value=get_config_bool('default_normalized', True))
         
         # DRT būsena
         self.drt_state = {'project': None, 'ds_list': []}
         self.drt_tau_min_var = tk.StringVar()
         self.drt_tau_max_var = tk.StringVar()
         self.drt_ds_var = tk.StringVar()
-        self.drt_results_var = tk.StringVar(value='(pasirinkite datasetą ir rėžius)')
+        self.drt_results_var = tk.StringVar(value=_('drt_results_placeholder', '(pasirinkite datasetą ir rėžius)'))
         self._drt_saved_peaks = [] # Čia saugosime išsaugotus pikus
         
         # Arenijaus būsena
@@ -344,7 +213,7 @@ class CeraMISApp:
         }
         self.sem_col_vars = {}    # Stulpelių priskyrimo StringVar kintamieji
         
-        self.current_file_var = tk.StringVar(value="Nepasirinktas joks failas")
+        self.current_file_var = tk.StringVar(value=_('no_file_selected', "No file selected"))
         self.current_filepath = FILE_PATH
         self.click_count = 0
         self.last_click_time = 0
@@ -355,6 +224,7 @@ class CeraMISApp:
         self.setup_arrhenius_tab()
         self.setup_drt_tab()
         self.setup_sem_stats_tab()
+        self.setup_settings_tab()
 
         if os.path.exists(self.current_filepath):
             self.load_file(self.current_filepath)
@@ -363,15 +233,34 @@ class CeraMISApp:
 
     def open_file_dialog(self):
         filetypes = (
-            ("Palaikomi failai", "*.txt *.z *.xlsx"),
-            ("Tekstiniai failai", "*.txt"),
-            ("ZView failai", "*.z"),
-            ("Excel failai", "*.xlsx"),
-            ("Visi failai", "*.*")
+            (_('filetype_supported', "Supported files"), "*.txt *.z *.xlsx"),
+            (_('filetype_txt', "Text files"), "*.txt"),
+            (_('filetype_zview', "ZView files"), "*.z"),
+            (_('filetype_excel', "Excel files"), "*.xlsx"),
+            (_('filetype_all', "All files"), "*.*")
         )
-        filepath = filedialog.askopenfilename(title="Atidaryti failą", filetypes=filetypes)
+        init_file = get_config_val('default_spectrum_file', '')
+        init_dir = None
+        if init_file and os.path.exists(init_file):
+            init_dir = os.path.dirname(init_file)
+        elif init_file and os.path.isdir(init_file):
+            init_dir = init_file
+            
+        filepath = filedialog.askopenfilename(
+            title=_('select_file_btn', "Select File..."),
+            filetypes=filetypes,
+            initialdir=init_dir
+        )
         if filepath:
             self.load_file(filepath)
+
+    def save_selected_temps(self):
+        selected = [str(t) for t, v in self.vars.items() if v.get()]
+        set_config_val('selected_temperatures', ",".join(selected))
+
+    def save_selected_freqs(self):
+        set_config_val('selected_freq_min', self.f_min_var.get())
+        set_config_val('selected_freq_max', self.f_max_var.get())
 
     def load_file(self, filepath):
         try:
@@ -445,9 +334,10 @@ class CeraMISApp:
                             
             self.current_file_var.set(os.path.basename(filepath))
             self.update_gui_after_load()
+            set_config_val('default_spectrum_file', filepath)
             
         except Exception as e:
-            messagebox.showerror("Klaida skaitant failą", f"Klaida: {e}")
+            messagebox.showerror(_('load_error_title', "Error reading file"), _('load_error_msg', "Error: {}").format(e))
 
     def center_window(self, win, w, h):
         """Centruoja langą ekrane, apribojant pagal ekrano dydį."""
@@ -457,12 +347,91 @@ class CeraMISApp:
         
         # Apribojame plotį ir aukštį, kad neviršytų ekrano
         w = min(w, int(sw * 0.95))
-        h = min(h, int(sh * 0.9))
+        h = min(h, sh - 60) # 60px paliekame užduočių juostai
         
         x = (sw // 2) - (w // 2)
-        y = (sh // 2) - (h // 2)
-        win.geometry(f"{w}x{h}+{max(0, x)}+{max(0, y)}")
+        y = max(0, (sh // 2) - (h // 2) - 20) # Šiek tiek kilstelime į viršų
+        win.geometry(f"{w}x{h}+{max(0, x)}+{y}")
+        
+        # Nustatome minimalų lango dydį, kuriame dar telpa visa vartotojo sąsaja (GUI) be jokių pasislėpimų
+        min_w = int(1200 * getattr(self, 'gui_scale', 1.0))
+        min_h = int(800 * getattr(self, 'gui_scale', 1.0))
+        win.minsize(min_w, min_h)
+        
         return w, h
+
+    def setup_settings_tab(self):
+        settings_frame = ttk.Frame(self.tab_settings, padding=20)
+        settings_frame.pack(fill="both", expand=True)
+        
+        tk.Label(settings_frame, text=_('tab_settings', "⚙️ Settings"), font=('Arial', 14, 'bold')).pack(anchor="w", pady=(0, 20))
+        
+        appearance_lf = ttk.LabelFrame(settings_frame, text=_('appearance_settings', "Appearance & Layout"), padding=15)
+        appearance_lf.pack(fill="x", pady=10)
+        
+        tk.Label(appearance_lf, text=_('gui_scale_label', "GUI Scale (Needs Restart):"), font=('Arial', 10)).grid(row=0, column=0, sticky="w", pady=5)
+        self.gui_scale_var = tk.StringVar(value=get_config_val('gui_scale', '1.0'))
+        scale_cb = ttk.Combobox(appearance_lf, textvariable=self.gui_scale_var, values=['0.75', '0.85', '1.0', '1.15', '1.25', '1.5', '1.75', '2.0'], state="readonly", width=15)
+        scale_cb.grid(row=0, column=1, padx=20, pady=5)
+        
+        def on_scale_change(event):
+            set_config_val('gui_scale', self.gui_scale_var.get())
+            messagebox.showinfo(_('msg_info', "Information"), _('restart_required_scale', "GUI Scale changed. Please restart CeraMIS to apply changes."))
+            
+        scale_cb.bind("<<ComboboxSelected>>", on_scale_change)
+        
+        lang_lf = ttk.LabelFrame(settings_frame, text=_('language_settings', "Language / Kalba"), padding=15)
+        lang_lf.pack(fill="x", pady=10)
+        
+        tk.Label(lang_lf, text=_('language_label', "Select Language (Needs Restart):"), font=('Arial', 10)).grid(row=0, column=0, sticky="w", pady=5)
+        self.lang_var = tk.StringVar(value=get_config_val('language', 'en'))
+        lang_cb = ttk.Combobox(lang_lf, textvariable=self.lang_var, values=['en', 'lt'], state="readonly", width=15)
+        lang_cb.grid(row=0, column=1, padx=20, pady=5)
+        
+        def on_lang_change(event):
+            set_config_val('language', self.lang_var.get())
+            messagebox.showinfo(_('msg_info', "Information"), _('restart_required_lang', "Language changed. Please restart CeraMIS to apply changes."))
+            
+        lang_cb.bind("<<ComboboxSelected>>", on_lang_change)
+        
+        # Paths Section
+        paths_lf = ttk.LabelFrame(settings_frame, text=_('paths_settings', "Default Paths / Files"), padding=15)
+        paths_lf.pack(fill="x", pady=10)
+        
+        def create_path_row(parent, row, label_key, default_text, config_key, is_dir=False):
+            tk.Label(parent, text=_(label_key, default_text), font=('Arial', 10)).grid(row=row, column=0, sticky="w", pady=5)
+            var = tk.StringVar(value=get_config_val(config_key, ''))
+            ttk.Entry(parent, textvariable=var, width=50).grid(row=row, column=1, padx=10, pady=5)
+            
+            def browse_cb():
+                if is_dir:
+                    path = filedialog.askdirectory(title=_(label_key, default_text))
+                else:
+                    path = filedialog.askopenfilename(title=_(label_key, default_text))
+                if path:
+                    var.set(path)
+                    set_config_val(config_key, path)
+            
+            ttk.Button(parent, text=_('browse_btn', "Browse..."), command=browse_cb).grid(row=row, column=2, padx=5, pady=5)
+
+        create_path_row(paths_lf, 0, 'default_eis_file', "Default EIS File:", 'default_spectrum_file')
+        create_path_row(paths_lf, 1, 'default_deareis_file', "Default dearEIS File:", 'default_deareis_project')
+        create_path_row(paths_lf, 2, 'default_sem_folder', "Default SEM Photos Folder:", 'default_sem_folder', is_dir=True)
+        create_path_row(paths_lf, 3, 'default_sem_stats_folder', "Default SEM Stats Folder:", 'default_sem_stats_folder', is_dir=True)
+
+        # SEM AI Settings
+        sem_settings_lf = ttk.LabelFrame(settings_frame, text=_('sem_settings_title', "SEM AI Settings"), padding=15)
+        sem_settings_lf.pack(fill="x", pady=10)
+        
+        tk.Label(sem_settings_lf, text=_('sam_model_version_label', "SAM Model Version:"), font=('Arial', 10)).grid(row=0, column=0, sticky="w", pady=5)
+        self.sam_version_var = tk.StringVar(value=get_config_val('sam_model_version', 'SAM 2.1'))
+        sam_cb = ttk.Combobox(sem_settings_lf, textvariable=self.sam_version_var, values=['SAM 2.1', 'SAM 3.1'], state="readonly", width=15)
+        sam_cb.grid(row=0, column=1, padx=20, pady=5)
+        
+        def on_sam_version_change(event):
+            set_config_val('sam_model_version', self.sam_version_var.get())
+            
+        sam_cb.bind("<<ComboboxSelected>>", on_sam_version_change)
 
     def setup_gui(self):
         try:
@@ -477,12 +446,12 @@ class CeraMISApp:
         except Exception as e:
             print(f"Nepavyko atvaizduoti logotipo: {e}")
 
-        tk.Label(self.tab_main, text="LLTO keramikos Mikrostruktūros ir Impedanso Analizės Sistema", font=('Arial', 14, 'bold')).pack(pady=10)
-        tk.Label(self.tab_main, text=f"Autorius: {AUTHOR}", fg="#555").pack()
+        tk.Label(self.tab_main, text=_('app_title', "CeraMIS - Ceramic Microstructure and Impedance System"), font=('Arial', 14, 'bold')).pack(pady=10)
+        tk.Label(self.tab_main, text=f"{_('author', 'Author')}: {AUTHOR}", fg="#555").pack()
         
         file_frame = tk.Frame(self.tab_main)
         file_frame.pack(pady=5, fill="x", padx=20)
-        tk.Button(file_frame, text="📂 Pasirinkti failą...", command=self.open_file_dialog, bg="#E0E0E0").pack(side="left")
+        tk.Button(file_frame, text=_('select_file_btn', "📂 Select File..."), command=self.open_file_dialog, bg="#E0E0E0").pack(side="left")
         tk.Label(file_frame, textvariable=self.current_file_var, fg="blue", wraplength=250, justify="left").pack(side="left", padx=10)
         
         # --- KONFIGŪRACIJOS KONTEINERIS (Grafikai + Geometrija) ---
@@ -490,13 +459,13 @@ class CeraMISApp:
         config_container.pack(pady=5, padx=20, fill="x")
 
         # --- GRAFIKŲ KONFIGŪRACIJA ---
-        graph_frame = tk.LabelFrame(config_container, text="Grafikų išdėstymas (3x3 matrica)", padx=10, pady=10)
+        graph_frame = tk.LabelFrame(config_container, text=_('graph_matrix_title', "Graph Layout (3x3 Matrix)"), padx=10, pady=10)
         graph_frame.pack(side="left", fill="both", expand=True)
         
-        self.graph_vars = [tk.StringVar() for _ in range(9)]
+        self.graph_vars = [tk.StringVar() for _ignore in range(9)]
         default_graphs = [
             "Z' vs f", "-Z'' vs f", "ε' vs f",
-            "Naikvisto grafikas", "Pilnutinė varža (|Z|) vs f", "Fazės kampas (-Θ) vs f",
+            _("Naikvisto grafikas", "Nyquist Plot"), _("Pilnutinė varža (|Z|) vs f", "Impedance Spectroscopy (|Z|) vs f"), _("Fazės kampas (-Θ) vs f", "Phase Angle (-Θ) vs f"),
             "ε'' vs f", "σ' vs f", "M'' vs f"
         ]
         
@@ -509,37 +478,37 @@ class CeraMISApp:
             cb.grid(row=row, column=col, padx=5, pady=2)
 
         # --- GEOMETRIJA (Šone, 1x2 stiliaus lentelė) ---
-        geo_frame = tk.LabelFrame(config_container, text="Bandinio geometrija", padx=15, pady=10)
+        geo_frame = tk.LabelFrame(config_container, text=_('sample_geometry_title', "Sample Geometry"), padx=15, pady=10)
         geo_frame.pack(side="right", fill="y", padx=(10, 0))
         
-        tk.Label(geo_frame, text="Storis L (mm):", font=('Arial', 9, 'bold')).grid(row=0, column=0, sticky="w", pady=5)
+        tk.Label(geo_frame, text=_('thickness_label', "Thickness L (mm):"), font=('Arial', 9, 'bold')).grid(row=0, column=0, sticky="w", pady=5)
         ttk.Entry(geo_frame, textvariable=self.thickness_var, width=10).grid(row=0, column=1, padx=5, pady=5)
         
-        tk.Label(geo_frame, text="Plotas A (mm²):", font=('Arial', 9, 'bold')).grid(row=1, column=0, sticky="w", pady=5)
+        tk.Label(geo_frame, text=_('area_label', "Area A (mm²):"), font=('Arial', 9, 'bold')).grid(row=1, column=0, sticky="w", pady=5)
         ttk.Entry(geo_frame, textvariable=self.area_var, width=10).grid(row=1, column=1, padx=5, pady=5)
         
-        tk.Checkbutton(geo_frame, text="Duomenys jau normalizuoti (Ω·m)", 
+        tk.Checkbutton(geo_frame, text=_('normalized_checkbox', "Data already normalized (Ω·m)"), 
                        variable=self.is_normalized_var, bg='#f0f0f0', font=('Arial', 9)).grid(row=2, column=0, columnspan=2, sticky="w", pady=(10,0))
 
         # --- TEMPERATŪRŲ ŽYMĖJIMAS ---
         selection_frame = tk.Frame(self.tab_main)
         selection_frame.pack(pady=5)
-        tk.Button(selection_frame, text="Pažymėti viską", command=self.select_all).pack(side="left", padx=5)
-        tk.Button(selection_frame, text="Atžymėti visus", command=self.deselect_all).pack(side="left", padx=5)
+        tk.Button(selection_frame, text=_('select_all_btn', "Select All"), command=self.select_all).pack(side="left", padx=5)
+        tk.Button(selection_frame, text=_('deselect_all_btn', "Deselect All"), command=self.deselect_all).pack(side="left", padx=5)
 
         # --- DIAPAZONŲ KONTEINERIS ---
         range_container = tk.Frame(self.tab_main)
         range_container.pack(pady=5, padx=20, fill="x")
 
         # --- TEMPERATŪRŲ ŽYMĖJIMAS IR DIAPAZONAS ---
-        temp_range_frame = tk.LabelFrame(range_container, text="Temperatūrų diapazonas (K)", padx=5, pady=5)
+        temp_range_frame = tk.LabelFrame(range_container, text=_('temp_range_title', "Temperature Range (K)"), padx=5, pady=5)
         temp_range_frame.pack(side="left", fill="both", expand=True, padx=(0, 5))
 
-        tk.Label(temp_range_frame, text="Nuo:").pack(side="left")
+        tk.Label(temp_range_frame, text=_('from_label', "From:")).pack(side="left")
         self.t_min_combo = ttk.Combobox(temp_range_frame, textvariable=self.t_min_var, width=8)
         self.t_min_combo.pack(side="left", padx=5)
 
-        tk.Label(temp_range_frame, text="Iki:").pack(side="left")
+        tk.Label(temp_range_frame, text=_('to_label', "To:")).pack(side="left")
         self.t_max_combo = ttk.Combobox(temp_range_frame, textvariable=self.t_max_var, width=8)
         self.t_max_combo.pack(side="left", padx=5)
         
@@ -548,17 +517,17 @@ class CeraMISApp:
             self.t_min_combo['values'] = temps
             self.t_max_combo['values'] = temps
 
-        tk.Button(temp_range_frame, text="Pasirinkti", command=self.select_temp_range).pack(side="left", padx=5)
+        tk.Button(temp_range_frame, text=_('select_btn', "Select"), command=self.select_temp_range).pack(side="left", padx=5)
 
         # --- FILTRACIJA (Dažnių intervalas) ---
-        filter_frame = tk.LabelFrame(range_container, text="Dažnių intervalas (Hz)", padx=5, pady=5)
+        filter_frame = tk.LabelFrame(range_container, text=_('freq_range_title', "Frequency Range (Hz)"), padx=5, pady=5)
         filter_frame.pack(side="right", fill="both", expand=True, padx=(5, 0))
         
-        tk.Label(filter_frame, text="Nuo:").pack(side="left")
+        tk.Label(filter_frame, text=_('from_label', "From:")).pack(side="left")
         self.f_min_combo = ttk.Combobox(filter_frame, textvariable=self.f_min_var, width=10)
         self.f_min_combo.pack(side="left", padx=2)
         
-        tk.Label(filter_frame, text="Iki:").pack(side="left")
+        tk.Label(filter_frame, text=_('to_label', "To:")).pack(side="left")
         self.f_max_combo = ttk.Combobox(filter_frame, textvariable=self.f_max_var, width=10)
         self.f_max_combo.pack(side="left", padx=2)
 
@@ -581,39 +550,39 @@ class CeraMISApp:
         self.scrollable_frame.bind("<Button-4>", self._on_temp_list_mousewheel)
         self.scrollable_frame.bind("<Button-5>", self._on_temp_list_mousewheel)
         
-        container.pack(expand=True, fill="both", padx=20)
+        btn_frame = tk.Frame(self.tab_main)
+        btn_frame.pack(side="bottom", pady=15)
+        
+        tk.Button(btn_frame, text=_('analyze_spectra_btn', "📈 Analyze Spectra"), command=self.open_plot, 
+                  bg="#2E7D32", fg="white", font=('Arial', 10, 'bold'), width=35, relief="raised", bd=3).pack(pady=4)
+        tk.Button(btn_frame, text=_('3d_analysis_btn', "🚀 3D Analysis"), command=self.open_3d_plots, 
+                  bg="#9C27B0", fg="white", font=('Arial', 10, 'bold'), width=35, relief="raised", bd=3).pack(pady=4)
+        tk.Button(btn_frame, text=_('fast_3d_btn', "⚡ High-Performance 3D Plot (GPU)"), command=self.open_fast_3d_plot, 
+                  bg="#E64A19", fg="white", font=('Arial', 10, 'bold'), width=35, relief="raised", bd=3).pack(pady=4)
+        tk.Button(btn_frame, text=_('custom_plot_btn', "🗺️ Custom Plot"), command=self.open_custom_plot, 
+                  bg="#00695C", fg="white", font=('Arial', 10, 'bold'), width=35, relief="raised", bd=3).pack(pady=4)
+        tk.Button(btn_frame, text=_('export_excel_btn', "📊 Export to Excel (.xlsx)"), command=self.export_excel, 
+                  bg="#1B5E20", fg="white", font=('Arial', 10, 'bold'), width=35, relief="raised", bd=3).pack(pady=4)
+        tk.Button(btn_frame, text=_('export_zview_btn', "📂 Export ZView (.z)"), command=self.export_zview, 
+                  bg="#0D47A1", fg="white", font=('Arial', 10, 'bold'), width=35, relief="raised", bd=3).pack(pady=4)
+
+        container.pack(side="top", expand=True, fill="both", padx=20)
         canvas.pack(side="left", expand=True, fill="both")
         scrollbar.pack(side="right", fill="y")
-        
-        btn_frame = tk.Frame(self.tab_main)
-        btn_frame.pack(pady=15)
-        
-        tk.Button(btn_frame, text="📈 Analizuoti spektrus", command=self.open_plot, 
-                  bg="#2E7D32", fg="white", font=('Arial', 10, 'bold'), width=35, relief="raised", bd=3).pack(pady=4)
-        tk.Button(btn_frame, text="🚀 3D Analizė", command=self.open_3d_plots, 
-                  bg="#9C27B0", fg="white", font=('Arial', 10, 'bold'), width=35, relief="raised", bd=3).pack(pady=4)
-        tk.Button(btn_frame, text="⚡ Greitaveikis 3D grafikas (GPU)", command=self.open_fast_3d_plot, 
-                  bg="#E64A19", fg="white", font=('Arial', 10, 'bold'), width=35, relief="raised", bd=3).pack(pady=4)
-        tk.Button(btn_frame, text="🗺️ Individualus grafikas", command=self.open_custom_plot, 
-                  bg="#00695C", fg="white", font=('Arial', 10, 'bold'), width=35, relief="raised", bd=3).pack(pady=4)
-        tk.Button(btn_frame, text="📊 Eksportuoti į Excel (.xlsx)", command=self.export_excel, 
-                  bg="#1B5E20", fg="white", font=('Arial', 10, 'bold'), width=35, relief="raised", bd=3).pack(pady=4)
-        tk.Button(btn_frame, text="📂 Eksportuoti ZView (.z)", command=self.export_zview, 
-                  bg="#0D47A1", fg="white", font=('Arial', 10, 'bold'), width=35, relief="raised", bd=3).pack(pady=4)
 
         # ── Modeliavimo skirtuko turinys ──────────────────────────────────
         fit_top = ttk.Frame(self.tab_fit, padding=20)
         fit_top.pack(fill="both", expand=True)
-        tk.Label(fit_top, text="Grandinės Modeliavimas", font=('Arial', 13, 'bold')).pack(pady=12)
-        tk.Label(fit_top, text="Pasirinkite grandinės tipą ir paspauskite 'Derinti modelį'.",
+        tk.Label(fit_top, text=_('circuit_modeling_title', "Circuit Modeling"), font=('Arial', 13, 'bold')).pack(pady=12)
+        tk.Label(fit_top, text=_('circuit_modeling_desc', "Select circuit type and click 'Fit Model'."),
                  fg="#555").pack()
-        fit_frame = tk.LabelFrame(fit_top, text="Modeliavimas", padx=15, pady=15)
+        fit_frame = tk.LabelFrame(fit_top, text=_('circuit_modeling_title', "Circuit Modeling"), padx=15, pady=15)
         fit_frame.pack(pady=20, padx=40, fill="x")
         self.circuit_var = tk.StringVar(value="R-RQ-RQ-Q")
         self.circuit_combo = ttk.Combobox(fit_frame, textvariable=self.circuit_var, width=20)
         self.circuit_combo['values'] = ("R-RC", "R-RQ", "R-RQ-RQ", "R-RQ-W")
         self.circuit_combo.pack(side="left", padx=5)
-        tk.Button(fit_frame, text="Derinti modelį", command=self.fit_data,
+        tk.Button(fit_frame, text=_('fit_btn', "Fit Model"), command=self.fit_data,
                   bg="#F57C00", fg="white", font=('Arial', 10, 'bold'), relief="raised", bd=3, padx=15).pack(side="left", padx=10)
         # Laikinai paslėptas – funkcijos išlieka
         self.notebook.hide(self.tab_fit)
@@ -621,36 +590,32 @@ class CeraMISApp:
         # ── Lanko Pločio skirtuko turinys ──────────────────────────────────
         arc_top = ttk.Frame(self.tab_arc, padding=20)
         arc_top.pack(fill="both", expand=True)
-        tk.Label(arc_top, text="Lanko Pločio Skaičiavimas", font=('Arial', 13, 'bold')).pack(pady=12)
-        tk.Label(arc_top, text="Skaičiuoja Naikvisto kreivės lanko plotį bei varžą.",
+        tk.Label(arc_top, text=_('arc_width_title', "Nyquist Arc Width & Resistance Calculation"), font=('Arial', 13, 'bold')).pack(pady=12)
+        tk.Label(arc_top, text=_('arc_width_desc', "Calculates the Nyquist plot arc width and real-axis resistance."),
                  fg="#555").pack()
-        tk.Button(arc_top, text="📏 Skaičiuoti lanko plotį (R)", command=self.show_arc_width_info,
+        tk.Button(arc_top, text=_('calc_arc_btn', "📏 Calculate Arc Width (R)"), command=self.show_arc_width_info,
                   bg="#FF8F00", fg="white", font=('Arial', 11, 'bold'), width=35, relief="raised", bd=3).pack(pady=30)
 
         # ── SEM Analizės skirtuko turinys ──────────────────────────────────
         sem_top = ttk.Frame(self.tab_sem, padding=20)
         sem_top.pack(fill="both", expand=True)
-        tk.Label(sem_top, text="SEM Mikrostruktūros Analizė (AI)",
+        tk.Label(sem_top, text=_('sem_ai_title', "SEM Microstructure AI Analysis"),
                  font=('Arial', 13, 'bold')).pack(pady=12)
         tk.Label(sem_top,
-                 text=("Naudoja SAM 2 (Segment Anything Model 2) automatiniam grūdelių segmentavimui\n"
-                       "ir išgaunamą 2D+3D morfologinę statistiką (diametras, sferiškumas, \n"
-                       "anizotropija, ribų tankis, šiurkštumas Ra, lūžio topologijos indeksas)."),
+                 text=_('sem_ai_desc', "Uses Segment Anything Model (SAM) for automatic grain segmentation\nin SEM micrographs and extracts 2D+3D morphological statistics\n(diameter, circularity, roughness Ra, fracture topology index)."),
                  fg="#444", justify="center").pack(pady=5)
-        tk.Button(sem_top, text="🔬 Paleisti SEM Analizę (AI)", command=self.open_sam_analyzer,
+        tk.Button(sem_top, text=_('run_sem_btn', "🔬 Run SEM AI Analyzer"), command=self.open_sam_analyzer,
                   bg="#4527A0", fg="white", font=('Arial', 11, 'bold'), width=35, relief="raised", bd=3).pack(pady=30)
                   
         # ── Kristalų Struktūros skirtuko turinys ──────────────────────────────────
         cryst_top = ttk.Frame(self.tab_crystal, padding=20)
         cryst_top.pack(fill="both", expand=True)
-        tk.Label(cryst_top, text="LLTO Kristalų Struktūra (3D)",
+        tk.Label(cryst_top, text=_('crystal_title', "LLTO Crystal Structure (3D)"),
                  font=('Arial', 13, 'bold')).pack(pady=12)
         tk.Label(cryst_top,
-                 text=("Interaktyvi 3D vizualizacija, skirta LLTO perovskito struktūrai.\n"
-                       "Palaikomas nepertraukiamas Li jonų šuolių animavimas, \n"
-                       "stechiometrijos konfigūravimas ir fazių (Cubic/Tetragonal) perjungimas."),
+                 text=_('crystal_desc', "Interactive 3D visualization of the LLTO perovskite structure.\nSupports real-time Li+ ion hop animation, stoichiometry config,\nand Cubic/Tetragonal phase switching."),
                  fg="#444", justify="center").pack(pady=5)
-        tk.Button(cryst_top, text="💎 Paleisti 3D Kristalų Vizualizaciją", command=self.open_crystal_viewer,
+        tk.Button(cryst_top, text=_('run_crystal_btn', "💎 Launch 3D Crystal Viewer"), command=self.open_crystal_viewer,
                   bg="#6A1B9A", fg="white", font=('Arial', 11, 'bold'), width=35, relief="raised", bd=3).pack(pady=30)
         
     def update_gui_after_load(self):
@@ -668,9 +633,19 @@ class CeraMISApp:
             except:
                 return 0.0
             
+        saved_temps_str = get_config_val('selected_temperatures', None)
+        if saved_temps_str is not None:
+            saved_temps = set(saved_temps_str.split(',')) if saved_temps_str else set()
+        else:
+            saved_temps = None
+
         for temp in sorted(self.data_dict.keys(), key=get_sort_key):
             var = tk.BooleanVar()
-            cb = tk.Checkbutton(self.scrollable_frame, text=f"{temp:g} K", variable=var)
+            if saved_temps is None:
+                var.set(True)
+            else:
+                var.set(str(temp) in saved_temps or f"{temp:g}" in saved_temps)
+            cb = tk.Checkbutton(self.scrollable_frame, text=f"{temp:g} K", variable=var, command=self.save_selected_temps)
             cb.pack(anchor='w', padx=60)
             cb.bind("<MouseWheel>", self._on_temp_list_mousewheel)
             cb.bind("<Button-4>", self._on_temp_list_mousewheel)
@@ -681,8 +656,19 @@ class CeraMISApp:
             formatted_freqs = [format_freq_with_units(f) for f in sorted(self.frequencies)]
             self.f_min_combo['values'] = formatted_freqs
             self.f_max_combo['values'] = formatted_freqs
-            self.f_min_combo.set(formatted_freqs[0])
-            self.f_max_combo.set(formatted_freqs[-1])
+            
+            saved_f_min = get_config_val('selected_freq_min', None)
+            saved_f_max = get_config_val('selected_freq_max', None)
+            
+            if saved_f_min in formatted_freqs:
+                self.f_min_combo.set(saved_f_min)
+            else:
+                self.f_min_combo.set(formatted_freqs[0])
+                
+            if saved_f_max in formatted_freqs:
+                self.f_max_combo.set(saved_f_max)
+            else:
+                self.f_max_combo.set(formatted_freqs[-1])
             
         if len(self.data_dict) > 0:
             temps = [str(t) for t in sorted(self.data_dict.keys(), key=get_sort_key)]
@@ -704,10 +690,12 @@ class CeraMISApp:
     def select_all(self):
         for var in self.vars.values():
             var.set(True)
+        self.save_selected_temps()
 
     def deselect_all(self):
         for var in self.vars.values():
             var.set(False)
+        self.save_selected_temps()
 
     def select_temp_range(self):
         try:
@@ -718,6 +706,7 @@ class CeraMISApp:
                     var.set(True)
                 else:
                     var.set(False)
+            self.save_selected_temps()
         except ValueError:
             messagebox.showwarning("Klaida", "Įveskite teisingas temperatūras!")
 
@@ -796,1169 +785,31 @@ class CeraMISApp:
     # ─── ARENIJAUS ANALIZĖS METODAI ──────────────────────────────────────────
 
     def setup_arrhenius_tab(self):
-        # UI kintamieji
-        self.arr_project_path_var = tk.StringVar()
-        self.arr_status_var = tk.StringVar(value='Laukiama projekto...')
-        self.arr_fit_mode_var = tk.StringVar(value='last')
-        self.arr_fit_index_var = tk.StringVar(value='0')
-        self.arr_fit_info_var = tk.StringVar(value='(ikelkite projektą)')
-        self.arr_ea_label_var = tk.StringVar(value='')
-        self.arr_reg_params = [None, None]
-        self.arr_point_info_var = tk.StringVar(value='Spauskite tašką info')
-        self.arr_r_check_vars = {}
-
-        # Pagrindinis konteineris
-        main_arr_f = ttk.Frame(self.tab_arr, padding=20)
-        main_arr_f.pack(fill=tk.BOTH, expand=True)
-
-        # --- Nustatymai ---
-        pf = ttk.LabelFrame(main_arr_f, text='DearEIS projekto failas (.json)', padding=10)
-        pf.pack(fill=tk.X, pady=5)
-        ttk.Entry(pf, textvariable=self.arr_project_path_var, width=50).pack(side=tk.LEFT, fill=tk.X, expand=True)
-        tk.Button(pf, text='Naršyti...', command=self.browse_dear_project, bg="#E0E0E0", relief="raised", bd=2).pack(side=tk.LEFT, padx=6)
-
-        fit_f = ttk.LabelFrame(main_arr_f, text='Fitting rezultato pasirinkimas', padding=10)
-        fit_f.pack(fill=tk.X, pady=5)
-        rb_f = ttk.Frame(fit_f)
-        rb_f.pack(fill=tk.X)
-        ttk.Radiobutton(rb_f, text='Paskutinis', variable=self.arr_fit_mode_var, value='last').pack(side=tk.LEFT, padx=6)
-        ttk.Radiobutton(rb_f, text='Pirmas', variable=self.arr_fit_mode_var, value='first').pack(side=tk.LEFT, padx=6)
-        ttk.Radiobutton(rb_f, text='Pagal indeksą:', variable=self.arr_fit_mode_var, value='index').pack(side=tk.LEFT, padx=6)
-        ttk.Entry(rb_f, textvariable=self.arr_fit_index_var, width=5).pack(side=tk.LEFT)
-        ttk.Label(fit_f, textvariable=self.arr_fit_info_var, foreground='#555', font=('Segoe UI', 8), wraplength=700).pack(anchor=tk.W, padx=4, pady=2)
-
-        self.arr_r_outer = ttk.LabelFrame(main_arr_f, text='R komponentai (pažymėkite kurie sudaro R_total)', padding=10)
-        self.arr_r_outer.pack(fill=tk.X, pady=5)
-        self.arr_r_inner = ttk.Frame(self.arr_r_outer)
-        self.arr_r_inner.pack(fill=tk.X)
-        ttk.Label(self.arr_r_inner, text='(ikelkite projektą)').pack()
-
-        ttk.Label(main_arr_f, textvariable=self.arr_status_var, foreground='#1565C0', font=('Segoe UI', 10, 'bold')).pack(pady=10)
-
-        btn_f = ttk.Frame(main_arr_f)
-        btn_f.pack(pady=20)
-        tk.Button(btn_f, text='📉 Braižyti Arenijaus grafiką', command=self.draw_arrhenius_plot,
-                  bg="#2E7D32", fg="white", font=('Arial', 11, 'bold'), width=30, relief="raised", bd=3).pack(side=tk.LEFT, padx=10)
-        tk.Button(btn_f, text='📊 Eksportuoti CSV', command=self.export_arrhenius_csv,
-                  bg="#1565C0", fg="white", font=('Arial', 11, 'bold'), width=30, relief="raised", bd=3).pack(side=tk.LEFT, padx=10)
-        tk.Button(btn_f, text='💾 Įrašyti projektą', command=self.save_arrhenius_project,
-                  bg="#D84315", fg="white", font=('Arial', 11, 'bold'), width=30, relief="raised", bd=3).pack(side=tk.LEFT, padx=10)
-
-        self._arr_scatter_sel = None
-        self._arr_scatter_unsel = None
-        self._arr_reg_line = None
-        self._arr_saved_artists = []
-        self._arr_active_idx = None
-        self._arr_active_marker = None
-
-    def browse_dear_project(self):
-        p = filedialog.askopenfilename(
-            title='Pasirinkite DearEIS projektą',
-            filetypes=[('DearEIS projektas', '*.json'), ('Visi failai', '*.*')]
-        )
-        if not p: return
-        self.arr_project_path_var.set(p)
-        try:
-            proj = load_dear_project(p)
-            self.arr_state['project'] = proj
-            self.arr_state['all_r_keys'] = get_all_r_keys(proj)
-            self.arr_state['fit_labels'] = get_fit_labels(proj)
-            self._refresh_arr_r_checkboxes()
-            self._refresh_arr_fit_info()
-            n_ds = len(proj.get('data_sets', []))
-            self.arr_status_var.set(f'Projektas įkeltas. Datasetai: {n_ds}')
-            # Atnaujiname DRT rezultatus ir parodome sėkmės pranešimą, nes failas įkeltas rankiniu būdu
-            self._refresh_drt_datasets(show_popup=True)
-        except Exception as e:
-            messagebox.showerror('Klaida', f'Nepavyko įkelti projekto:\n{e}')
-
-    def _refresh_arr_fit_info(self):
-        fl = self.arr_state['fit_labels']
-        if not fl:
-            self.arr_fit_info_var.set('(nėra fitting rezultatų)')
-            return
-        first_uuid = next(iter(fl))
-        entries = fl[first_uuid]
-        lines = ['  - ' + desc for _, desc in entries[:5]]
-        if len(entries) > 5: lines.append(f'  ... ir dar {len(entries)-5}')
-        self.arr_fit_info_var.set('Fitting rezultatai (pirmas datasetas):\n' + '\n'.join(lines))
-
-    def _refresh_arr_r_checkboxes(self):
-        for w in self.arr_r_inner.winfo_children(): w.destroy()
-        self.arr_r_check_vars.clear()
-        keys = self.arr_state['all_r_keys']
-        if not keys:
-            ttk.Label(self.arr_r_inner, text='(ikelkite projektą)').pack()
-            return
-        for i, rk in enumerate(keys):
-            var = tk.BooleanVar(value=True)
-            self.arr_r_check_vars[rk] = var
-            ttk.Checkbutton(self.arr_r_inner, text=rk, variable=var).grid(row=0, column=i, padx=8, pady=2, sticky=tk.W)
+        from arrhenius_module import setup_arrhenius_tab
+        setup_arrhenius_tab(self)
 
     def load_default_project(self):
-        """Automatiškai įkelia numatytąjį projektą, jei jis egzistuoja."""
-        if os.path.exists(DEFAULT_PROJECT_PATH):
-            self.arr_project_path_var.set(DEFAULT_PROJECT_PATH)
-            try:
-                proj = load_dear_project(DEFAULT_PROJECT_PATH)
-                self.arr_state['project'] = proj
-                self.arr_state['all_r_keys'] = get_all_r_keys(proj)
-                self.arr_state['fit_labels'] = get_fit_labels(proj)
-                self._refresh_arr_r_checkboxes()
-                self._refresh_arr_fit_info()
-                n_ds = len(proj.get('data_sets', []))
-                self.arr_status_var.set(f'Projektas įkeltas (automatiškai). Datasetai: {n_ds}')
-                # Užkraunant automatiškai pradiniame ekrane, DRT pranešimo nerodome
-                self._refresh_drt_datasets(show_popup=False)
-            except Exception:
-                pass
+        from arrhenius_module import load_default_project
+        load_default_project(self)
 
     # ─── DRT ANALIZĖS METODAI ────────────────────────────────────────────────
 
     def setup_drt_tab(self):
-        main_f = ttk.Frame(self.tab_drt, padding=20)
-        main_f.pack(fill=tk.BOTH, expand=True)
-
-        # 1. Projekto pasirinkimas
-        pf = ttk.LabelFrame(main_f, text='DearEIS projekto failas (bendras su Arenijaus skirtuku)', padding=10)
-        pf.pack(fill=tk.X, pady=5)
-        ttk.Label(pf, textvariable=self.arr_project_path_var, font=('Segoe UI', 8), foreground='#555', wraplength=800).pack(fill=tk.X, expand=True)
-        tk.Button(pf, text='🔄 Atnaujinti datasetų sąrašą iš projekto', command=self._refresh_drt_datasets, 
-                  bg="#E0E0E0", relief="raised", bd=2).pack(pady=5)
-
-        # 2. Dataseto pasirinkimas
-        ds_f = ttk.LabelFrame(main_f, text='Pasirinkite temperatūrą (Datasetą)', padding=10)
-        ds_f.pack(fill=tk.X, pady=5)
-        self.drt_ds_combo = ttk.Combobox(ds_f, textvariable=self.drt_ds_var, state='readonly', width=50)
-        self.drt_ds_combo.pack(side=tk.LEFT, padx=5)
-        
-        # 3. Piko rėžiai
-        lim_f = ttk.LabelFrame(main_f, text='Piko ribos integracijai (neprivaloma)', padding=10)
-        lim_f.pack(fill=tk.X, pady=5)
-        ttk.Label(lim_f, text='tau min (s):').grid(row=0, column=0, padx=5)
-        ttk.Entry(lim_f, textvariable=self.drt_tau_min_var, width=15).grid(row=0, column=1, padx=5)
-        ttk.Label(lim_f, text='tau max (s):').grid(row=0, column=2, padx=5)
-        ttk.Entry(lim_f, textvariable=self.drt_tau_max_var, width=15).grid(row=0, column=3, padx=5)
-        ttk.Label(lim_f, text='(palikite tuščia automatiniam radimui)', font=('Segoe UI', 8, 'italic')).grid(row=0, column=4, padx=10)
-
-        # 4. Rezultatai
-        res_f = ttk.LabelFrame(main_f, text='Rezultatai', padding=10)
-        res_f.pack(fill=tk.X, pady=10)
-        ttk.Label(res_f, textvariable=self.drt_results_var, font=('Segoe UI', 11, 'bold'), foreground='#2E7D32').pack()
-
-        # 5. Mygtukai
-        btn_f = ttk.Frame(main_f)
-        btn_f.pack(pady=20)
-        tk.Button(btn_f, text='📈 Analizuoti ir braižyti DRT', command=self.run_drt_analysis,
-                  bg="#2E7D32", fg="white", font=('Arial', 11, 'bold'), width=30, relief="raised", bd=3).pack(pady=5)
-        
-        tk.Button(btn_f, text='🗺️ Braižyti 3D DRT (T vs f)', command=self.plot_3d_drt,
-                  bg="#1565C0", fg="white", font=('Arial', 11, 'bold'), width=30, relief="raised", bd=3).pack(pady=5)
+        from drt_module import setup_drt_tab
+        setup_drt_tab(self)
 
     def _refresh_drt_datasets(self, show_popup=True):
-        proj = self.arr_state['project']
-        if not proj:
-            if show_popup:
-                messagebox.showwarning("Dėmesio", "Pirmiausia įkelkite projektą Arenijaus skirtuke.")
-            return
-        
-        self.drt_state['ds_list'] = []
-        labels = []
-        for ds in proj.get('data_sets', []):
-            uuid = ds.get('uuid')
-            # Tikriname ar šis datasetas turi DRT duomenis
-            tau, _ = self._extract_drt_from_json(proj, uuid)
-            if tau is not None and len(tau) > 0:
-                label = ds.get('label', uuid)
-                self.drt_state['ds_list'].append((uuid, label))
-                labels.append(label)
-        
-        self.drt_ds_combo['values'] = labels
-        if labels: 
-            self.drt_ds_combo.current(0)
-            if show_popup:
-                messagebox.showinfo("Sėkmė", f"Rasta datasetų su DRT rezultatais: {len(labels)}")
-        else:
-            self.drt_ds_var.set('')
-            self.drt_ds_combo['values'] = []
-            if show_popup:
-                messagebox.showwarning("Dėmesio", "Projekte nerasta jokių DRT rezultatų. Atlikite DRT skaičiavimą dearEIS programoje.")
+        from drt_module import _refresh_drt_datasets
+        return _refresh_drt_datasets(self, show_popup)
 
     def run_drt_analysis(self):
-        proj = self.arr_state['project']
-        if not proj:
-            messagebox.showerror("Klaida", "Nėra įkelto projekto.")
-            return
-        
-        ds_idx = self.drt_ds_combo.current()
-        if ds_idx < 0:
-            messagebox.showwarning("Dėmesio", "Pasirinkite datasetą.")
-            return
-        
-        uuid, label = self.drt_state['ds_list'][ds_idx]
-        
-        # 1. Ištraukiame DRT duomenis
-        tau, gamma = self._extract_drt_from_json(proj, uuid)
-        if tau is None or len(tau) == 0:
-            messagebox.showerror("Klaida", f"Datasetas '{label}' neturi DRT rezultatų dearEIS faile.")
-            return
-
-        # 2. Nuskaitome rėžius
-        tmin = tmax = None
-        try:
-            if self.drt_tau_min_var.get().strip(): tmin = float(self.drt_tau_min_var.get())
-            if self.drt_tau_max_var.get().strip(): tmax = float(self.drt_tau_max_var.get())
-        except ValueError:
-            messagebox.showerror("Klaida", "Neteisingi tau rėžiai.")
-            return
-
-        # 3. Atliekame analizę (integracija R = ∫ gamma d(ln(tau)))
-        ln_tau = np.log(tau)
-        if tmin is not None and tmax is not None:
-            mask = (tau >= tmin) & (tau <= tmax)
-        else:
-            # Automatinis piko radimas
-            peaks, _ = find_peaks(gamma, height=np.max(gamma)*0.1)
-            if len(peaks) == 0:
-                messagebox.showwarning("Dėmesio", "Nepavyko automatiškai rasti piko. Nurodykite rėžius rankiniu būdu.")
-                return
-            peak_idx = peaks[np.argmax(gamma[peaks])]
-            # Piko papėdės radimas
-            thresh = gamma[peak_idx] * 0.05
-            start = peak_idx
-            while start > 0 and gamma[start] > thresh: start -= 1
-            end = peak_idx
-            while end < len(gamma)-1 and gamma[end] > thresh: end += 1
-            mask = np.zeros_like(gamma, dtype=bool)
-            mask[start:end+1] = True
-
-        t_slice = tau[mask]
-        g_slice = gamma[mask]
-        ln_t_slice = ln_tau[mask]
-
-        if len(t_slice) < 3:
-            messagebox.showwarning("Dėmesio", "Per mažai taškų nurodytame rėžyje.")
-            return
-
-        R = simpson(y=g_slice, x=ln_t_slice)
-        tau_p = t_slice[np.argmax(g_slice)]
-        C = tau_p / R if R != 0 else 0
-        
-        self.drt_results_var.set(f"R = {R:.4f} Ω  |  C = {C:.4E} F  |  τ_p = {tau_p:.2E} s")
-
-        # 4. Braižome grafiką
-        self._plot_drt_popup(tau, gamma, label)
-
-    def _parse_temp(self, label):
-        match = re.search(r"(\d+\.?\d*)", label)
-        return float(match.group(1)) if match else 0.0
+        from drt_module import run_drt_analysis
+        return run_drt_analysis(self)
 
     def plot_3d_drt(self):
-        proj = self.arr_state['project']
-        if not proj:
-            messagebox.showerror("Klaida", "Nėra įkelto projekto.")
-            return
-            
-        drt_data = []
-        for uuid, label in self.drt_state['ds_list']:
-            tau, gamma = self._extract_drt_from_json(proj, uuid)
-            if tau is not None and len(tau) > 0:
-                temp = self._parse_temp(label)
-                # Dažnis f = 1 / (2 * pi * tau)
-                freqs = 1.0 / (2 * np.pi * tau)
-                drt_data.append((temp, freqs, gamma))
-        
-        if not drt_data:
-            messagebox.showwarning("Dėmesio", "Nerasta jokių DRT duomenų projekte.")
-            return
+        from drt_module import plot_3d_drt
+        return plot_3d_drt(self)
 
-        # Rūšiuojame pagal temperatūrą
-        drt_data.sort(key=lambda x: x[0])
-        
-        # Sukuriame bendrą log-dažnių ašį interpoliacijai
-        all_f = np.concatenate([d[1] for d in drt_data])
-        f_min, f_max = np.min(all_f), np.max(all_f)
-        f_grid = np.geomspace(f_min, f_max, 200)
-        log_f_grid = np.log10(f_grid)
-        
-        X_vals, Y_vals, Z_vals = [], [], []
-        for temp, f_vals, g_vals in drt_data:
-            # Rūšiuojame pagal dažnį (interp1d reikalauja didėjančio x)
-            idx = np.argsort(f_vals)
-            f_s, g_s = f_vals[idx], g_vals[idx]
-            
-            f_interp = interp1d(np.log10(f_s), g_s, bounds_error=False, fill_value=0)
-            g_interp = f_interp(log_f_grid)
-            
-            X_vals.append(log_f_grid)
-            Y_vals.append([temp] * len(log_f_grid))
-            Z_vals.append(g_interp)
-            
-        X = np.array(X_vals)
-        Y = np.array(Y_vals)
-        Z = np.array(Z_vals)
-        
-        # Braižome 3D
-        sw = tk.Toplevel(self.root)
-        sw.title("3D DRT Žemėlapis")
-        self.center_window(sw, 1400, 1001) # Pradinis +1px layoutui
-        
-        fig = Figure(figsize=(12, 9), dpi=100, facecolor='white')
-        ax = fig.add_subplot(111, projection='3d')
-        surf = ax.plot_surface(X, Y, Z, cmap='viridis', edgecolor='none', alpha=0.9, antialiased=True)
-        
-        ax.set_xlabel('log₁₀(f), Hz', labelpad=15, rotation=0)
-        ax.set_ylabel('Temperatūra, K', labelpad=15, rotation=0)
-        ax.set_zlabel('γ(ln τ), Ω', labelpad=15, rotation=90)
-        ax.xaxis.set_rotate_label(False)
-        ax.yaxis.set_rotate_label(False)
-        ax.zaxis.set_rotate_label(False)
-        ax.set_title("DRT pasiskirstymas nuo temperatūros ir dažnio", pad=20, fontweight='bold')
-        
-        
-        # Pridinis pasukimas geresniam vaizdui
-        ax.view_init(elev=30, azim=-120)
-        
-        # Toolbaras ir Canvas
-        tb_frame = tk.Frame(sw)
-        tb_frame.pack(side=tk.BOTTOM, fill=tk.X)
-        
-        canvas = FigureCanvasTkAgg(fig, master=sw)
-        canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
-        
-        toolbar = NavigationToolbar2Tk(canvas, tb_frame)
-        toolbar.update()
-        
-        canvas.mpl_connect('button_press_event', self.on_plot_click)
-        
-        sw.update()
-        self.center_window(sw, 1400, 1001) # Pirmas šuolis
-        sw.update()
-        self.center_window(sw, 1400, 1000) # Galutinis fiksavimas
-        canvas.draw()
-
-    def _extract_drt_from_json(self, proj, ds_uuid):
-        # 1. Tikriname fits (dažniausia vieta)
-        fits = proj.get('fits', {}).get(ds_uuid, [])
-        for f in reversed(fits):
-            # Tikriname 'results' viduje
-            res = f.get('results', {})
-            t, g = self._find_tau_gamma_in_dict(res)
-            if t is not None: return t, g
-            
-            # Tikriname pačiame fit objekte
-            t, g = self._find_tau_gamma_in_dict(f)
-            if t is not None: return t, g
-
-        # 2. Tikriname specializuotus DRT blokus (įskaitant 'drts')
-        for key in ['drts', 'drt_results', 'drt', 'drt_data']:
-            root = proj.get(key, {}).get(ds_uuid, [])
-            # Jei tai sąrašas (kaip vartotojo pavyzdyje), tikriname kiekvieną elementą
-            if isinstance(root, list):
-                for item in reversed(root):
-                    t, g = self._find_tau_gamma_in_dict(item)
-                    if t is not None: return t, g
-            else:
-                t, g = self._find_tau_gamma_in_dict(root)
-                if t is not None: return t, g
-        
-        # Debug: jei nieko neradome, atspausdiname raktus į terminalą pagalbai
-        if ds_uuid in proj.get('drts', {}):
-            drt_list = proj['drts'][ds_uuid]
-            if drt_list and isinstance(drt_list, list):
-                print(f"DEBUG: 'drts' bloke rasti raktai UUID {ds_uuid}: {list(drt_list[0].keys())}")
-            
-        if ds_uuid in proj.get('fits', {}) and len(proj['fits'].get(ds_uuid, [])) > 0:
-            fit0 = proj['fits'][ds_uuid][0]
-            print(f"DEBUG: Nerasta DRT duomenu UUID {ds_uuid}. Fit 0 raktai: {list(fit0.keys())}")
-            if 'results' in fit0:
-                print(f"DEBUG: Results raktai: {list(fit0['results'].keys())}")
-        else:
-            print(f"DEBUG: Nerasta DRT duomenu UUID {ds_uuid}. Fit duomenu nera.")
-            
-        return None, None
-
-    def _find_tau_gamma_in_dict(self, d):
-        if not isinstance(d, dict): return None, None
-        
-        # 1. Potencialūs laiko/dažnio raktai
-        # Pridedame 'time_constants', kurį matome debug'e
-        t_keys = [k for k in d.keys() if any(x in k.lower() for x in ['tau', 'relaxation', 'time_constant', 'times'])]
-        f_keys = [k for k in d.keys() if 'freq' in k.lower()]
-        
-        # 2. Potencialūs gamma raktai
-        # Pridedame 'mean_gammas' ir 'real_gammas'
-        all_g_keys = [k for k in d.keys() if any(x in k.lower() for x in ['gamma', 'distrib', 'g_val', 'df']) or k.lower() == 'g']
-        # Prioritetas: real_gammas, mean_gammas, gammas...
-        g_keys = sorted(all_g_keys, key=lambda x: ('imaginary' in x.lower(), 'real' not in x.lower(), 'mean' not in x.lower()))
-
-        def try_extract(tk, gk, is_freq=False):
-            t_val, g_val = d[tk], d[gk]
-            if isinstance(t_val, (list, np.ndarray)) and isinstance(g_val, (list, np.ndarray)):
-                if len(t_val) > 5 and len(t_val) == len(g_val):
-                    try:
-                        t_arr = np.array(t_val, dtype=float)
-                        g_arr = np.array(g_val, dtype=float)
-                        if is_freq: t_arr = 1.0 / (2 * np.pi * t_arr)
-                        idx = np.argsort(t_arr)
-                        return t_arr[idx], g_arr[idx]
-                    except: return None
-            return None
-
-        # Bandome visas kombinacijas
-        for gk in g_keys:
-            # Pirmiausia bandome su tiesioginiais laiko raktais (tau, time_constants)
-            for tk in t_keys:
-                res = try_extract(tk, gk, False)
-                if res: return res
-            # Tada su dažniais
-            for fk in f_keys:
-                res = try_extract(fk, gk, True)
-                if res: return res
-                
-        return None, None
-
-    def _plot_drt_popup(self, tau, gamma, label):
-        win = tk.Toplevel(self.root)
-        win.title(f"DRT Analizė - {label}")
-        self.center_window(win, 1560, 1106) # Pradinis +1px layoutui
-        win.configure(bg='white')
-
-        self._drt_temp_peak = None # Dabartinis nebaigtas pikas
-        self._drt_saved_peaks = [] # Išvalome senus pikus naujam langui
-        
-        # Valdymo panelė viršuje
-        ctrl_f = tk.Frame(win, bg='white', pady=10)
-        ctrl_f.pack(fill=tk.X)
-        
-        info_label = tk.Label(ctrl_f, text="Pažymėkite piko sritį grafike (stačiakampiu)", 
-                              font=('Segoe UI', 10, 'italic'), bg='white', fg='#555')
-        info_label.pack()
-        
-        btn_f = tk.Frame(win, bg='white', pady=5)
-        btn_f.pack(fill=tk.X)
-        
-        if self.is_normalized_var.get():
-            res_var = tk.StringVar(value="ρ_p = --- | C_p = ---")
-            r_unit = "Ω·m"
-            r_name = "ρ"
-        else:
-            res_var = tk.StringVar(value="R_p = --- | C_p = ---")
-            r_unit = "Ω"
-            r_name = "R"
-            
-        tk.Label(btn_f, textvariable=res_var, font=('Segoe UI', 12, 'bold'), bg='white', fg='#2E7D32').pack(side=tk.LEFT, padx=20)
-        
-        def save_peak():
-            if self._drt_temp_peak:
-                self._drt_saved_peaks.append(self._drt_temp_peak)
-                self._drt_temp_peak = None
-                redraw()
-        
-        def clear_peaks():
-            self._drt_saved_peaks.clear()
-            self._drt_temp_peak = None
-            redraw()
-
-        tk.Button(btn_f, text='➕ Išsaugoti piką', command=save_peak, bg="#43A047", fg="white", font=('Segoe UI', 9, 'bold')).pack(side=tk.LEFT, padx=5)
-        tk.Button(btn_f, text='🧹 Išvalyti visus', command=clear_peaks, bg="#E53935", fg="white", font=('Segoe UI', 9, 'bold')).pack(side=tk.LEFT, padx=5)
-
-        fig = Figure(figsize=(14, 9), dpi=100, facecolor='white')
-        ax = fig.add_subplot(111)
-        
-        canvas = FigureCanvasTkAgg(fig, master=win)
-        canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
-        
-        # Toolbaras apačioje
-        tb_frame = tk.Frame(win, bg='white')
-        tb_frame.pack(side=tk.BOTTOM, fill=tk.X)
-        NavigationToolbar2Tk(canvas, tb_frame)
-        
-        win.update()
-        self.center_window(win, 1560, 1105) # Galutinis dydis
-        canvas.draw()
-
-        self._drt_popup_artists = []
-        ax.semilogx(tau, gamma, 'k-', lw=1.5, label='DRT spektas', alpha=0.8)
-
-        def redraw():
-            # Pašaliname tik pikus, ne visą ašį (kad neišsitrintų parinkiklis)
-            for art in self._drt_popup_artists:
-                try: art.remove()
-                except: pass
-            self._drt_popup_artists = []
-            
-            cmap = plt.colormaps.get_cmap('Set1')
-            
-            # Piešiame išsaugotus pikus
-            for i, p in enumerate(self._drt_saved_peaks):
-                color = cmap(i % 9)
-                f = ax.fill_between(p['ts'], p['gs'], color=color, alpha=0.4, 
-                                   label=f"Pikas {i+1}: {r_name}={p['R']:.3f} {r_unit}, C={p['C']:.2E} F")
-                s = ax.scatter(p['tp'], np.max(p['gs']), color=color, s=40, edgecolors='black')
-                self._drt_popup_artists.extend([f, s])
-
-            # Piešiame dabartinį pasirinkimą
-            if self._drt_temp_peak:
-                p = self._drt_temp_peak
-                f_temp = ax.fill_between(p['ts'], p['gs'], color='gray', alpha=0.3, linestyle='--', label='Dabartinis')
-                self._drt_popup_artists.append(f_temp)
-                res_var.set(f"R_p = {p['R']:.4f} Ω | C_p = {p['C']:.4E} F")
-            else:
-                res_var.set("R_p = --- | C_p = ---")
-
-            ax.set_xlabel(r'Relaxation Time $\tau$, s')
-            ax.set_ylabel(r'Distribution Function $\gamma$, \Omega')
-            ax.set_title(f"DRT Analizė: {label}")
-            ax.grid(True, which="both", alpha=0.2)
-            
-            handles, labels = ax.get_legend_handles_labels()
-            if labels:
-                ax.legend(fontsize=8, loc='best')
-            canvas.draw_idle()
-
-        def on_select(eclick, erelease):
-            tmin, tmax = sorted([eclick.xdata, erelease.xdata])
-            mask = (tau >= tmin) & (tau <= tmax)
-            ts = tau[mask]
-            gs = gamma[mask]
-            if len(ts) < 3: return
-            
-            ln_t = np.log(tau)
-            ln_ts = ln_t[mask]
-            R = simpson(y=gs, x=ln_ts)
-            tp = ts[np.argmax(gs)]
-            C = tp / R if R != 0 else 0
-            
-            self._drt_temp_peak = {'ts': ts, 'gs': gs, 'R': R, 'C': C, 'tp': tp}
-            redraw()
-
-        # Stilius žymėjimo stačiakampiui
-        props = dict(facecolor='#1565C0', alpha=0.2, edgecolor='black', linewidth=1)
-        win.rs = RectangleSelector(ax, on_select, useblit=False, button=[1, 3], 
-                                   minspanx=0, minspany=0, interactive=True, props=props)
-        redraw()
-
-    def _update_arr_extrapolation(self, *args):
-        # Prioritetas aktyviam taškui (burbuliukui)
-        active_params = getattr(self, '_arr_active_reg_params', (None, None))
-        active_color = getattr(self, '_arr_active_bubble_color', '#1565C0')
-        
-        slope, intercept = active_params
-        ea, sigma0 = None, None
-        source_label = ""
-
-        if slope is not None:
-            kB = 8.617333e-5
-            ea = -slope * kB * 1000
-            sigma0 = np.exp(intercept)
-        else:
-            # Jei aktyvaus nėra, imam dabartinę regresiją
-            slope, intercept = getattr(self, 'arr_reg_params', (None, None))
-            active_color = '#1565C0'
-            if slope is not None:
-                kB = 8.617333e-5
-                ea = -slope * kB * 1000
-                sigma0 = np.exp(intercept)
-        
-        if ea is None:
-            if hasattr(self, 'arr_extrap_res_var'):
-                self.arr_extrap_res_var.set('Pasirinkite tašką arba regresiją')
-            return
-
-        try:
-            val_str = self.arr_extrap_t_var.get().strip()
-            if not val_str: return
-            tc = float(val_str.replace(',', '.'))
-            tk_val = tc + 273.15
-            if tk_val <= 0: raise ValueError
-            
-            # sigma = (sigma0 / T) * exp(-Ea / (kB * T))
-            kB = 8.617333e-5
-            sigma = (sigma0 / tk_val) * np.exp(-ea / (kB * tk_val))
-            
-            # Atnaujiname tekstą ir spalvą
-            self.arr_extrap_res_var.set(f"σ({tc}°C) = {to_sci_unicode(sigma, 4)} S/cm")
-            if hasattr(self, 'arr_extrap_res_label'):
-                self.arr_extrap_res_label.config(fg=active_color)
-        except (ValueError, Exception):
-            self.arr_extrap_res_var.set('Neteisinga T')
-
-    def _compute_arr_df(self):
-        proj = self.arr_state['project']
-        if proj is None:
-            messagebox.showerror('Klaida', 'Įkelkite projektą.')
-            return None
-        try:
-            if self.is_normalized_var.get():
-                L_cm = 1.0
-                A_cm2 = 100.0 # sigma(S/cm) = 1/(rho(Ohm*m)*100)
-            else:
-                # Imam iš pagrindinio lango (ten mm ir mm2)
-                L_mm = float(self.thickness_var.get())
-                A_mm2 = float(self.area_var.get())
-                
-                # extract_fit_data tikisi cm ir cm2
-                L_cm = L_mm / 10.0
-                A_cm2 = A_mm2 / 100.0
-        except ValueError:
-            messagebox.showerror('Klaida', 'Neteisingi geometrijos duomenys pagrindiniame lange.')
-            return None
-        A = A_cm2
-        r_sel = [rk for rk, var in self.arr_r_check_vars.items() if var.get()]
-        if not r_sel: r_sel = self.arr_state['all_r_keys'] or []
-        mode = self.arr_fit_mode_var.get()
-        fi = self.arr_fit_index_var.get().strip() if mode == 'index' else mode
-        df = extract_fit_data(proj, L_cm, A_cm2, r_sel, fi)
-        if df.empty:
-            messagebox.showwarning('Įspėjimas', 'Nerasta tinkamų duomenų.')
-            return None
-        return df
-
-    def draw_arrhenius_plot(self):
-        df = self._compute_arr_df()
-        if df is None: return
-        self._arr_df_cache[0] = df
-        self._arr_point_selected.clear()
-        self.arr_point_info_var.set('Spauskite tašką info')
-
-        # Sukuriame naują langą grafikui
-        arr_win = tk.Toplevel(self.root)
-        
-        # Nustatome dinaminį pavadinimą pagal parinktas varžas
-        r_sel = [rk for rk, var in self.arr_r_check_vars.items() if var.get()]
-        if len(r_sel) == 2:
-            arr_win.title("Arenijaus grafikas ($R$=$R_{t}$+$R_{gr}$)")
-        elif len(r_sel) == 1:
-            arr_win.title(f"Arenijaus grafikas ({r_sel[0]})")
-        else:
-            arr_win.title("Arenijaus analizė")
-            
-        self.center_window(arr_win, 1200, 900)
-
-        # Ea label ir pasirinkimo mygtukai viršuje
-        ctrl_f = tk.Frame(arr_win, bg='white', padx=10, pady=5)
-        ctrl_f.pack(fill=tk.X)
-        
-        tk.Label(ctrl_f, textvariable=self.arr_ea_label_var, foreground='#B71C1C', 
-                 font=('Segoe UI', 12, 'bold'), bg='white').pack(side=tk.LEFT)
-                 
-        tk.Label(ctrl_f, textvariable=self.arr_point_info_var, foreground='#2E7D32',
-                 font=('Segoe UI', 10, 'bold'), bg='white').pack(side=tk.RIGHT, padx=20)
-        
-        # Ekstrapoliacijos sekcija
-        extrap_f = tk.LabelFrame(arr_win, text='Ekstrapoliacija (iš regresijos)', bg='white', padx=10, pady=5)
-        extrap_f.pack(fill=tk.X, padx=10, pady=5)
-        
-        tk.Label(extrap_f, text='Temperatūra:', bg='white').pack(side=tk.LEFT, padx=5)
-        self.arr_extrap_t_var = tk.StringVar(value='25')
-        ext_t_entry = ttk.Entry(extrap_f, textvariable=self.arr_extrap_t_var, width=8)
-        ext_t_entry.pack(side=tk.LEFT, padx=5)
-        tk.Label(extrap_f, text='°C', bg='white').pack(side=tk.LEFT)
-        
-        self.arr_extrap_res_var = tk.StringVar(value='')
-        self.arr_extrap_res_label = tk.Label(extrap_f, textvariable=self.arr_extrap_res_var, foreground='#1565C0',
-                 font=('Segoe UI', 10, 'bold'), bg='white')
-        self.arr_extrap_res_label.pack(side=tk.LEFT, padx=30)
-        
-        self.arr_extrap_t_var.trace_add('write', self._update_arr_extrapolation)
-        
-        btn_sel_f = tk.Frame(arr_win, bg='white', padx=10, pady=5)
-        btn_sel_f.pack(fill=tk.X)
-        tk.Label(btn_sel_f, text="Regresija:", bg='white', font=('Segoe UI', 9, 'bold')).pack(side=tk.LEFT, padx=5)
-        tk.Button(btn_sel_f, text='Visi taškai', command=self._select_all_arr_points, 
-                  bg="#E0E0E0", relief="raised", bd=2).pack(side=tk.LEFT, padx=5)
-        tk.Button(btn_sel_f, text='Atžymėti visus', command=self._clear_arr_sel, 
-                  bg="#E0E0E0", relief="raised", bd=2).pack(side=tk.LEFT, padx=5)
-        
-        # Nauji mygtukai kelioms linijoms
-        line_ctrl_f = tk.Frame(arr_win, bg='white', padx=10, pady=5)
-        line_ctrl_f.pack(fill=tk.X)
-        tk.Button(line_ctrl_f, text='➕ Išsaugoti liniją', command=self._save_arr_line,
-                  bg="#43A047", fg="white", font=('Segoe UI', 9, 'bold'), relief="raised", bd=2).pack(side=tk.LEFT, padx=5)
-        tk.Button(line_ctrl_f, text='🧹 Išvalyti visas linijas', command=self._clear_saved_arr_lines,
-                  bg="#E53935", fg="white", font=('Segoe UI', 9, 'bold'), relief="raised", bd=2).pack(side=tk.LEFT, padx=5)
-
-        self.arr_fig = Figure(figsize=(9, 6), dpi=100, facecolor='white')
-        self.arr_ax = self.arr_fig.add_subplot(111)
-        self.arr_ax.grid(True, alpha=0.3)
-        
-        self.arr_canvas = FigureCanvasTkAgg(self.arr_fig, master=arr_win)
-        
-        # Toolbar pridedame į apačią PRIEŠ canvas, kad jo nenustumtų už ekrano
-        tb_frame = tk.Frame(arr_win)
-        tb_frame.pack(side=tk.BOTTOM, fill=tk.X)
-        self.arr_toolbar = NavigationToolbar2Tk(self.arr_canvas, tb_frame)
-        self.arr_toolbar.update()
-
-        self._arr_saved_artists = []
-        self._arr_saved_lines = []
-
-        def on_arr_select(eclick, erelease):
-            df = self._arr_df_cache[0]
-            if df is None: return
-            xall, yall = df['1000/T'].values, df['ln(Sigma*T)'].values
-            valid = ~(np.isnan(xall) | np.isnan(yall))
-            x_v, y_v = xall[valid], yall[valid]
-            xmin, xmax = sorted([eclick.xdata, erelease.xdata])
-            ymin, ymax = sorted([eclick.ydata, erelease.ydata])
-            is_select = (eclick.button == 1)
-            for i in range(len(x_v)):
-                if xmin <= x_v[i] <= xmax and ymin <= y_v[i] <= ymax:
-                    self._arr_point_selected[i] = is_select
-            self._recompute_arr_regression()
-
-        self.arr_rs = RectangleSelector(self.arr_ax, on_arr_select,
-                                        useblit=False, button=[1, 3],
-                                        minspanx=0, minspany=0,
-                                        interactive=False)
-        
-        self.arr_canvas.mpl_connect('button_press_event', self._on_arr_plot_click)
-        self.arr_canvas.mpl_connect('key_press_event', self._on_arr_key_press)
-        
-        # Priverčiame canvas gauti klaviatūros fokusą, kai pelė užvedama
-        self.arr_canvas.get_tk_widget().bind("<Enter>", lambda e: self.arr_canvas.get_tk_widget().focus_set())
-
-        xall = df['1000/T'].values
-        yall = df['ln(Sigma*T)'].values
-        yerr = df['ln_err'].values
-        valid = ~(np.isnan(xall) | np.isnan(yall))
-        x_v, y_v, ye_v = xall[valid], yall[valid], yerr[valid]
-
-        for i in range(len(x_v)): self._arr_point_selected[i] = True
-        
-        r_sel = [rk for rk, var in self.arr_r_check_vars.items() if var.get()]
-        all_keys = self.arr_state.get('all_r_keys', [])
-        
-        if len(r_sel) == 1 and len(all_keys) >= 2:
-            if r_sel[0] == all_keys[0]:
-                r_type_str = "R_{gr}"
-            elif r_sel[0] == all_keys[1]:
-                r_type_str = "R_{t}"
-            else:
-                r_type_str = f"R_{{{r_sel[0]}}}"
-        elif not r_sel:
-            r_type_str = "R_{total}"
-        else:
-            r_type_str = "R_{total}"
-            
-        self.arr_ax.set_xlabel('1000/T, 1/K')
-        self.arr_ax.set_ylabel(r'$\ln(\sigma \cdot T)$, S$\cdot$K/cm')
-        self.arr_ax.set_title(f'Arenijaus grafikas (${r_type_str}$)', pad=20)
-        
-        # Pridedame antrinę X ašį su Kelvino temperatūra viršuje
-        def t_forward(x):
-            x = np.array(x, dtype=float)
-            x[np.abs(x) < 1e-10] = 1e-10 # Išvengiame dalybos iš nulio
-            return 1000.0 / x
-
-        def t_inverse(t):
-            t = np.array(t, dtype=float)
-            t[np.abs(t) < 1e-10] = 1e-10
-            return 1000.0 / t
-
-        secax = self.arr_ax.secondary_xaxis('top', functions=(t_forward, t_inverse))
-        secax.set_xlabel('T, K')
-        
-        if len(x_v) > 0:
-            xmin, xmax = min(x_v), max(x_v)
-            pad_x = (xmax - xmin) * 0.05 if xmax > xmin else 0.1
-            xmin, xmax = xmin - pad_x, xmax + pad_x
-            self.arr_ax.set_xlim(xmin, xmax)
-            
-            ymin, ymax = min(y_v), max(y_v)
-            pad_y = (ymax - ymin) * 0.05 if ymax > ymin else 0.1
-            self.arr_ax.set_ylim(ymin - pad_y, ymax + pad_y)
-            
-            # Priverčiame sugeneruoti apatinės ašies padalas
-            self.arr_fig.canvas.draw()
-            xticks = self.arr_ax.get_xticks()
-            
-            # Paliekame tik tas padalas, kurios yra matomame rėžyje
-            valid_xticks = xticks[(xticks >= xmin) & (xticks <= xmax) & (xticks > 1e-5)]
-            
-            if len(valid_xticks) > 0:
-                # Nustatome viršutinės ašies padalas tose pačiose vertikaliose linijose
-                secax.set_xticks(1000.0 / valid_xticks)
-                import matplotlib.ticker as ticker
-                secax.xaxis.set_major_formatter(ticker.FuncFormatter(lambda val, pos: f"{val:.1f}".rstrip('0').rstrip('.')))
-        
-        # Instrukcijų label apačioje
-        tk.Label(arr_win, text="🖱️ Žymėti/atžymėti su rėmeliu (kair./deš. pelytė). 🎯 Paspauskite tašką informacijai.", 
-                 bg='#f0f0f0', font=('Segoe UI', 9, 'italic'), pady=3).pack(side=tk.BOTTOM, fill=tk.X)
-
-        # Galiausiai supakuojame canvas, kad jis užimtų likusią laisvą vietą
-        self.arr_canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=True)
-
-        self.arr_fig.tight_layout()
-        self._recompute_arr_regression()
-        self.arr_status_var.set(f'Grafikas paruoštas. Taškų: {len(x_v)}')
-
-        # Vieno pikselio "refresh" triukas, kad grafikas persipieštų ir teisingai pritaikytų layout'ą
-        def force_refresh():
-            w, h = arr_win.winfo_width(), arr_win.winfo_height()
-            if w > 100:
-                arr_win.geometry(f"{w+1}x{h}")
-                arr_win.after(50, lambda: arr_win.geometry(f"{w}x{h}"))
-        arr_win.after(200, force_refresh)
-
-    def _recompute_arr_regression(self):
-        df = self._arr_df_cache[0]
-        if df is None: return
-        xall, yall = df['1000/T'].values, df['ln(Sigma*T)'].values
-        yerr = df['ln_err'].values
-        valid = ~(np.isnan(xall) | np.isnan(yall))
-        x_v, y_v, ye_v = xall[valid], yall[valid], yerr[valid]
-        n = len(x_v)
-
-        sel_idx = [i for i in range(n) if self._arr_point_selected.get(i, True)]
-        unsel_idx = [i for i in range(n) if not self._arr_point_selected.get(i, True)]
-
-        if self._arr_scatter_sel is not None: self._arr_scatter_sel.remove()
-        if self._arr_scatter_unsel is not None: self._arr_scatter_unsel.remove()
-        if self._arr_reg_line is not None:
-            try: self._arr_reg_line[0].remove()
-            except: pass
-        
-        for art in self._arr_saved_artists:
-            try: art.remove()
-            except: pass
-        self._arr_saved_artists = []
-        
-        if not hasattr(self, '_arr_errorbars'): self._arr_errorbars = []
-        for container in self._arr_errorbars:
-            try: container.remove()
-            except: pass
-        self._arr_errorbars = []
-
-        self._arr_scatter_sel = self._arr_scatter_unsel = self._arr_reg_line = None
-
-        if sel_idx:
-            self._arr_scatter_sel = self.arr_ax.scatter(x_v[sel_idx], y_v[sel_idx], c='#1565C0', s=70, zorder=5, label=f'Dabartiniai ({len(sel_idx)})')
-        if unsel_idx:
-            self._arr_scatter_unsel = self.arr_ax.scatter(x_v[unsel_idx], y_v[unsel_idx], facecolors='none', edgecolors='#aaa', s=70, zorder=4)
-            
-        for xi, yi, yei in zip(x_v, y_v, ye_v):
-            if not np.isnan(yei) and yei > 0:
-                container = self.arr_ax.errorbar(xi, yi, yerr=yei, fmt='none', ecolor='#90CAF9', capsize=3, zorder=2)
-                self._arr_errorbars.append(container)
-        
-        # Braižome išsaugotas linijas ir jų taškus
-        cmap = plt.cm.Set1
-        for i, ld in enumerate(self._arr_saved_lines):
-            color = cmap(i % 9)
-            art = self.arr_ax.plot(ld['xfit'], ld['yfit'], '--', color=color, lw=1.5, zorder=3,
-                                  label=f"$E_a$ {i+1}: {format_comma(ld['ea'], 4)} eV, σ₀: {to_sci_unicode(ld['sigma0'], 3)} S·K/cm ($R^2$={format_comma(ld['r2'], 4)})")
-            self._arr_saved_artists.extend(art)
-            if 'sel_idx' in ld:
-                idx = ld['sel_idx']
-                pts = self.arr_ax.scatter(x_v[idx], y_v[idx], color=color, s=50, zorder=6, alpha=0.8)
-                self._arr_saved_artists.append(pts)
-
-        if len(sel_idx) >= 2:
-            xs, ys = x_v[sel_idx], y_v[sel_idx]
-            slope, intercept, r_val, p, se = stats.linregress(xs, ys)
-            xfit = np.linspace(xs.min(), xs.max(), 300)
-            kB = 8.617333e-5
-            ea_now = -slope * kB * 1000
-            sigma0_now = np.exp(intercept)
-            self.arr_reg_params[0], self.arr_reg_params[1] = slope, intercept
-            self._arr_reg_line = self.arr_ax.plot(xfit, slope * xfit + intercept, 'r-', lw=2, zorder=3,
-                                                 label=f'Dabartinė: $E_a$={format_comma(ea_now, 4)} eV, σ₀={to_sci_unicode(sigma0_now, 3)} S·K/cm ($R^2$={format_comma(r_val**2, 4)})')
-            self.arr_ea_label_var.set(f'Eₐ = {format_comma(ea_now, 4)} eV  |  σ₀ = {to_sci_unicode(sigma0_now, 3)} S·K/cm  |  R² = {format_comma(r_val**2, 4)}')
-            self._update_arr_extrapolation()
-        else:
-            self.arr_reg_params[0] = None
-            self.arr_ea_label_var.set('(pažymėkite taškus regresijai)')
-            self._update_arr_extrapolation()
-
-        handles, labels = self.arr_ax.get_legend_handles_labels()
-        if labels:
-            self.arr_ax.legend(fontsize=8, loc='center right')
-        self.arr_canvas.draw_idle()
-
-    def _save_arr_line(self):
-        df = self._arr_df_cache[0]
-        if df is None: return
-        xall, yall = df['1000/T'].values, df['ln(Sigma*T)'].values
-        valid = ~(np.isnan(xall) | np.isnan(yall))
-        x_v, y_v = xall[valid], yall[valid]
-        sel_idx = [i for i in range(len(x_v)) if self._arr_point_selected.get(i, True)]
-        
-        if len(sel_idx) < 2:
-            messagebox.showwarning("Dėmesio", "Linijai išsaugoti reikia bent 2 pažymėtų taškų.")
-            return
-            
-        xs, ys = x_v[sel_idx], y_v[sel_idx]
-        slope, intercept, r_val, p, se = stats.linregress(xs, ys)
-        xfit = np.linspace(xs.min(), xs.max(), 300)
-        kB = 8.617333e-5
-        ea = -slope * kB * 1000
-        
-        self._arr_saved_lines.append({
-            'xfit': xfit, 'yfit': slope * xfit + intercept,
-            'ea': ea, 'r2': r_val**2,
-            'sigma0': np.exp(intercept),
-            'slope': slope,
-            'intercept': intercept,
-            'sel_idx': list(sel_idx)
-        })
-        for i in range(len(x_v)): self._arr_point_selected[i] = False
-        self._recompute_arr_regression()
-
-    def _clear_saved_arr_lines(self):
-        self._arr_saved_lines = []
-        self._recompute_arr_regression()
-
-    def _on_arr_plot_click(self, event):
-        if event.inaxes != getattr(self, 'arr_ax', None): return
-        
-        if event.button == 3:
-            self.on_plot_click(event)
-            return
-            
-        if event.button != 1: return # Tik kairysis pelės klavišas
-        
-        df = self._arr_df_cache[0]
-        if df is None: return
-        
-        xall, yall = df['1000/T'].values, df['ln(Sigma*T)'].values
-        valid = ~(np.isnan(xall) | np.isnan(yall))
-        xv, yv = xall[valid], yall[valid]
-        valid_indices = np.where(valid)[0]
-        
-        if len(xv) == 0: return
-        
-        # Randame arčiausiai pelės esantį tašką pikselių atstumu
-        click_disp = self.arr_ax.transData.transform((event.xdata, event.ydata))
-        points_disp = self.arr_ax.transData.transform(np.c_[xv, yv])
-        dists = np.linalg.norm(points_disp - click_disp, axis=1)
-        
-        min_idx = np.argmin(dists)
-        if dists[min_idx] < 15: # 15 pikselių tolerancija
-            # Atnaujiname aktyvų indeksą ir pašaliname seną žymeklį
-            active_idx = valid_indices[min_idx]
-            self._arr_active_idx = active_idx
-            
-            if getattr(self, '_arr_active_marker', None) is not None:
-                try: self._arr_active_marker.remove()
-                except: pass
-
-            # Nustatome burbuliuko spalvą ir skaičiavimo parametrus pagal tai, kuriai regresijai priklauso taškas
-            bubble_color = '#1565C0' # Numatytoji (mėlyna - dabartinė)
-            
-            x = xall[active_idx]
-            y_data = yall[active_idx]
-            T_K = 1000.0 / x
-            T_C = T_K - 273.15
-            
-            # Numatytasis skaičiavimas iš duomenų taško, jei nėra regresijos
-            calc_y = y_data
-            active_params = (None, None)
-            source_info = "Duomenų taškas"
-            
-            # Tikriname priklausomybę regresijoms (išsaugotoms ir dabartinei)
-            # Pirmiausia tikriname išsaugotas (nes jos turi specifines spalvas)
-            found_saved = False
-            if hasattr(self, '_arr_saved_lines'):
-                cmap = plt.cm.Set1
-                for i, ld in reversed(list(enumerate(self._arr_saved_lines))):
-                    if active_idx in ld.get('sel_idx', []):
-                        bubble_color = cmap(i % 9)
-                        if 'slope' in ld and 'intercept' in ld:
-                            calc_y = ld['slope'] * x + ld['intercept']
-                            active_params = (ld['slope'], ld['intercept'])
-                        else:
-                            # Atsarginis variantas jei trūksta parametrų
-                            calc_y = y_data
-                            active_params = (None, None)
-                        source_info = f"Linija {i+1}"
-                        found_saved = True
-                        break
-            
-            # Jei nerasta išsaugotose arba taškas yra aktyvioje parinktyje, pirmenybė dabartinei
-            if self._arr_point_selected.get(active_idx, True):
-                slope, intercept = getattr(self, 'arr_reg_params', (None, None))
-                if slope is not None:
-                    bubble_color = '#1565C0'
-                    calc_y = slope * x + intercept
-                    active_params = (slope, intercept)
-                    source_info = "Dabartinė regresija"
-                    found_saved = False # Prioritetas aktyviai
-            elif not found_saved:
-                bubble_color = '#777777' # Pilka jei niekur nepriklauso (neatliekama analizė)
-                active_params = (None, None)
-            
-            # Išsaugome ekstrapoliacijai
-            self._arr_active_reg_params = active_params
-            self._arr_active_bubble_color = bubble_color
-            
-            self._arr_active_marker = self.arr_ax.plot(
-                [x], [y_data], 
-                'o', color='none', mec=bubble_color, mew=2.5, ms=15, zorder=10
-            )[0]
-            
-            # Paskaičiuojame σ pagal parinktą y (iš regresijos arba taško)
-            try:
-                sigma_fit = np.exp(calc_y) / T_K
-                
-                # Pridedame informaciją į legendą
-                if getattr(self, '_arr_legend_point', None):
-                    try: self._arr_legend_point.remove()
-                    except: pass
-                
-                leg_label = f"Taškas: {T_C:.2f} °C | σ = {to_sci_unicode(sigma_fit, 2)} S/cm"
-                self._arr_legend_point = self.arr_ax.plot([], [], 'o', color='none', 
-                                                         mec=bubble_color, mew=2, ms=10, 
-                                                         label=leg_label)[0]
-                self.arr_ax.legend(fontsize=8, loc='best')
-                
-                self.arr_fig.canvas.draw_idle()
-                self._update_arr_extrapolation()
-            except Exception as e:
-                pass
-            # Paskaičiuojame varžą pagal dabartinę poziciją
-            x = xall[self._arr_active_idx]
-            y = yall[self._arr_active_idx]
-            T = 1000.0 / x
-            try:
-                if self.is_normalized_var.get():
-                    L_cm = 1.0
-                    A_cm2 = 100.0
-                    val_name = "ρ"
-                    val_unit = "Ω·m"
-                else:
-                    L_cm = float(str(self.thickness_var.get()).replace(',', '.')) * 0.1
-                    A_cm2 = float(str(self.area_var.get()).replace(',', '.')) * 0.01
-                    val_name = "R"
-                    val_unit = "Ω"
-                    
-                sigma = sigma_fit # Naudojame tą, kurį apskaičiavome aukščiau iš regresijos
-                # Paskaičiuojame atitinkamą varžą (arba ρ) iš modelio
-                R = (L_cm / A_cm2) / sigma
-                
-                self.arr_point_info_var.set(f"Taškas ({source_info}): {T_C:.2f} °C | σ = {to_sci_unicode(sigma, 4)} S/cm")
-                self.arr_status_var.set(f"Pasirinktas taškas {T_K:.1f} K ({source_info}). {val_name} = {to_sci_unicode(R, 3)} {val_unit} | σ = {to_sci_unicode(sigma, 4)} S/cm")
-            except Exception as e:
-                self.arr_status_var.set(f"Pasirinktas taškas {T:.1f} K.")
-
-    def _on_arr_key_press(self, event):
-        return # Funkcija išjungta naudotojo prašymu
-        
-        r_sel = [rk for rk, var in self.arr_r_check_vars.items() if var.get()]
-        if not r_sel: r_sel = self.arr_state['all_r_keys'] or []
-        
-        if len(r_sel) != 1:
-            self.arr_status_var.set("Perstūmimas galimas tik pasirinkus lygiai VIENĄ varžos komponentą!")
-            return
-            
-        df = self._arr_df_cache[0]
-        if df is None: return
-        
-        # Keičiame Y poziciją (ln(Sigma*T))
-        step = 0.05
-        if k == 'up':
-            df.at[self._arr_active_idx, 'ln(Sigma*T)'] += step
-        elif k == 'down':
-            df.at[self._arr_active_idx, 'ln(Sigma*T)'] -= step
-            
-        x = df.at[self._arr_active_idx, '1000/T']
-        y = df.at[self._arr_active_idx, 'ln(Sigma*T)']
-        T = 1000.0 / x
-        
-        try:
-            L_cm = float(str(self.thickness_var.get()).replace(',', '.')) * 0.1
-            A_cm2 = float(str(self.area_var.get()).replace(',', '.')) * 0.01
-            R_new = (L_cm * T) / (A_cm2 * np.exp(y))
-            
-            # Įrašome atgal į projekto būseną (tik tam vienam R elementui)
-            ds_uuid = df.at[self._arr_active_idx, 'ds_uuid']
-            fit_idx_str = self.arr_fit_index_var.get().strip()
-            fit_list = self.arr_state['project'].get("fits", {}).get(ds_uuid, [])
-            
-            if fit_list:
-                if fit_idx_str == "last": fit = fit_list[-1]
-                elif fit_idx_str == "first": fit = fit_list[0]
-                else:
-                    try:
-                        idx = int(fit_idx_str)
-                        fit = fit_list[min(idx, len(fit_list) - 1)]
-                    except:
-                        fit = fit_list[-1]
-                
-                parameters = fit.get("parameters", {})
-                rk = r_sel[0]
-                
-                if rk in parameters and "R" in parameters[rk]:
-                    parameters[rk]["R"]["value"] = R_new
-                    
-            self.arr_status_var.set(f"Perstumta atmintyje! Nauja varža {T:.1f} K: {to_sci_unicode(R_new)} Ω. (Nepamirškite įrašyti projekto)")
-        except Exception as e:
-            self.arr_status_var.set(f"Perstumta! (Klaida: {e})")
-            
-        if getattr(self, '_arr_active_marker', None) is not None:
-            self._arr_active_marker.set_data([x], [y])
-            
-        self._recompute_arr_regression()
-        self.arr_fig.canvas.draw_idle()
-
-
-    def _select_all_arr_points(self):
-        df = self._arr_df_cache[0]
-        if df is None: return
-        n = int(np.sum(~(np.isnan(df['1000/T'].values) | np.isnan(df['ln(Sigma*T)'].values))))
-        for i in range(n): self._arr_point_selected[i] = True
-        self._recompute_arr_regression()
-
-    def _clear_arr_sel(self):
-        df = self._arr_df_cache[0]
-        if df is None: return
-        n = int(np.sum(~(np.isnan(df['1000/T'].values) | np.isnan(df['ln(Sigma*T)'].values))))
-        for i in range(n): self._arr_point_selected[i] = False
-        
-        # Pašaliname ir raudoną burbuliuką (aktyvų tašką)
-        if getattr(self, '_arr_active_marker', None) is not None:
-            try: self._arr_active_marker.remove()
-            except: pass
-            self._arr_active_marker = None
-        
-        if getattr(self, '_arr_legend_point', None) is not None:
-            try: self._arr_legend_point.remove()
-            except: pass
-            self._arr_legend_point = None
-            self.arr_ax.legend(fontsize=8, loc='best')
-            
-        self._arr_active_idx = None
-        self.arr_status_var.set("Visi taškai atžymėti.")
-        
-        self._recompute_arr_regression()
-
-    def save_arrhenius_project(self):
-        proj = self.arr_state.get('project')
-        if not proj:
-            messagebox.showwarning('Įspėjimas', 'Nėra atidaryto projekto.')
-            return
-            
-        filepath = self.arr_project_path_var.get()
-        if not filepath or not os.path.exists(filepath):
-            messagebox.showwarning('Įspėjimas', 'Nerastas originalus projekto failas.')
-            return
-            
-        try:
-            with open(filepath, 'w', encoding='utf-8') as f:
-                json.dump(proj, f, indent=4)
-            self.arr_status_var.set(f"Pakeitimai sėkmingai išsaugoti į {os.path.basename(filepath)}!")
-            messagebox.showinfo('Sėkmė', 'Projektas sėkmingai atnaujintas ir išsaugotas.')
-        except Exception as e:
-            messagebox.showerror('Klaida', f'Klaida išsaugant projektą:\n{e}')
-
-    def export_arrhenius_csv(self):
-        df = self._compute_arr_df()
-        if df is None: return
-        out = filedialog.asksaveasfilename(title='Išsaugoti CSV', defaultextension='.csv', initialfile='arenijaus_duomenys.csv', filetypes=[('CSV failas', '*.csv'), ('Visi failai', '*.*')])
-        if not out: return
-        df.to_csv(out, index=False, float_format='%.6g')
-        messagebox.showinfo('Sėkmė', f'CSV išsaugotas:\n{out}')
 
     def open_crystal_viewer(self):
         import subprocess
@@ -2866,7 +1717,7 @@ class CeraMISApp:
 
             # Sukuriame naują langą
             sw = tk.Toplevel(self.root)
-            sw.title("Savęs grafikas")
+            sw.title("Savo grafikas")
             self.center_window(sw, 1000, 750)
 
             fig = Figure(figsize=(9, 6), dpi=100, facecolor='white')
@@ -2887,7 +1738,7 @@ class CeraMISApp:
                 ax = fig.add_subplot(111)
                 # Stock spalvos (C0, C1, ...)
                 temp_to_color = {t: f"C{i % 10}" for i, t in enumerate(selected)}
-                for temp, xd, yd, _ in datasets:
+                for temp, xd, yd, _ignore in datasets:
                     color = temp_to_color[temp] if len(selected) > 1 else '#1f77b4'
                     ax.plot(xd, yd, 'o-', ms=2, lw=0.8, color=color, label=f"{temp:g} K")
                 ax.set_title(f"{xlabel} vs {ylabel}")
@@ -3284,15 +2135,21 @@ class CeraMISApp:
             import sys
             subprocess.Popen([sys.executable, script_path, temp_file, '--plot_id', str(plot_id)])
         else:
-            messagebox.showerror("Klaida", "Nerastas 'pyvista_3d_viewer.py' failas.")
+            messagebox.showerror(_('msg_error', "Error"), _('script_not_found', "Script {} not found.").format('pyvista_3d_viewer.py'))
 
     def open_sam_analyzer(self):
-        script_path = os.path.join(os.path.dirname(__file__), 'sam2_sem_analyzer.py')
+        sam_version = get_config_val('sam_model_version', 'SAM 2.1')
+        if sam_version == 'SAM 3.1':
+            script_name = 'sam3_sem_analyzer.py'
+        else:
+            script_name = 'sam2_sem_analyzer.py'
+            
+        script_path = os.path.join(os.path.dirname(__file__), script_name)
         if os.path.exists(script_path):
             import sys
             subprocess.Popen([sys.executable, script_path])
         else:
-            messagebox.showerror("Klaida", "Nerastas 'sam2_sem_analyzer.py' failas.")
+            messagebox.showerror(_('msg_error', "Error"), _('script_not_found', "Script {} not found.").format(script_name))
 
     def estimate_arc_width(self, z):
         if len(z) < 3: return 0.0
@@ -3414,8 +2271,16 @@ if __name__ == "__main__":
 
     root = tk.Tk()
     
-    # Padidiname bazini srifta visai programai
-    default_font = ("Segoe UI", 10)
+    # Padidiname bazini srifta visai programai pagal GUI masteli
+    gui_scale = float(get_config_val('gui_scale', '1.0'))
+    try:
+        current_scaling = root.tk.call('tk', 'scaling')
+        root.tk.call('tk', 'scaling', current_scaling * gui_scale)
+    except:
+        pass
+        
+    base_font_size = int(10 * gui_scale)
+    default_font = ("Segoe UI", base_font_size)
     root.option_add("*Font", default_font)
     style = ttk.Style(root)
     style.configure(".", font=default_font)

@@ -2,7 +2,7 @@
 ### Atsipalaidavimo Trukmių Pasiskirstymo Modulis (`CeraMIS`)
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg?logo=python&logoColor=white)](https://www.python.org/)
-[![dearEIS Core](https://img.shields.io/badge/dearEIS-Integration-red.svg)](https://github.com/kbknudsen/PyEIS)
+[![dearEIS Core](https://img.shields.io/badge/dearEIS-Integration-red.svg)](https://github.com/vyrjana/DearEIS)
 [![Numerical Integration](https://img.shields.io/badge/Integration-Simpson%20(SciPy)-green.svg)](https://scipy.org/)
 [![3D Visualization](https://img.shields.io/badge/Mapping-3D%20Surface-orange.svg)](https://matplotlib.org/)
 
@@ -14,7 +14,7 @@
 
 ## ⚙️ Pagrindinis Funkcionalumas ir Architektūra
 
-Modulis tiesiogiai integruojasi su dearEIS projekto failais, ištraukdamas apskaičiuotus DRT spektro duomenis ($\tau$ ir $\gamma$) ir atlikdamas jų integravimą bei trimatį atvaizdavimą.
+Modulis tiesiogiai integruojasi su [dearEIS](https://github.com/vyrjana/DearEIS) projekto failais, ištraukdamas apskaičiuotus DRT spektro duomenis ($\tau$ ir $\gamma$) ir atlikdamas jų integravimą bei trimatį atvaizdavimą.
 
 ```mermaid
 graph TD

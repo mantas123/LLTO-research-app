@@ -26,8 +26,8 @@ import tkinter as tk
 from tkinter import simpledialog
 import cv2
 import pyvista as pv
-from skimage.feature import peak_local_max
 import torch
+from language_driver import _, get_config_val, get_config_bool, set_config_val
 
 
 # Padėsime atsiųsti modelio svorius su progresu
@@ -139,7 +139,7 @@ class SAMAutomaticAnalyzer:
             root = tk.Tk()
             root.withdraw()
             root.attributes('-topmost', True)
-            length_um = simpledialog.askfloat("Mastelis", "Įveskite pažymėtos mastelio linijos ilgį mikrometrais (µm):", minvalue=0.001)
+            length_um = simpledialog.askfloat(_('sam_scale_win_title', "Scale"), _('sam_scale_prompt', "Enter the length of the marked scale line in micrometers (µm):"), minvalue=0.001)
             root.destroy()
             
             if length_um is not None:
@@ -153,9 +153,7 @@ class SAMAutomaticAnalyzer:
                 # Pereiname į srities (ROI) pasirinkimą
                 self.state = 'ROI'
                 self.ax2d.set_title(
-                    "ŽINGSNIS 2: Pasirinkite apdorojimo sritį!\n"
-                    "Apveskite su pele norimą sritį (kad išvengtumėte nereikalingos informacijos apačioje).\n"
-                    "Paspauskite 'Enter', kai baigsite.",
+                    _('sam_step2_title', "STEP 2: Select the processing region!\nDrag a rectangle with the mouse over the desired region.\nPress 'Enter' when done."),
                     color='blue', fontweight='bold'
                 )
                 self.roi_selector = RectangleSelector(
@@ -206,8 +204,7 @@ class SAMAutomaticAnalyzer:
             # Praleidžiame mastelio nustatymą, einame tiesiai prie ROI
             self.state = 'ROI'
             self.ax2d.set_title(
-                "PASIRINKITE APDOROJIMO SRITĮ!\n"
-                "Apveskite su pele norimą sritį ir paspauskite 'Enter'.",
+                _('sam_step2_title', "STEP 2: Select the processing region!\nDrag a rectangle with the mouse over the desired region.\nPress 'Enter' when done."),
                 color='blue', fontweight='bold', fontsize=14
             )
             self.roi_selector = RectangleSelector(
@@ -219,10 +216,7 @@ class SAMAutomaticAnalyzer:
             self.state = 'SCALE'
             self.scale_p1 = None
             self.scale_p2 = None
-            title_text = (
-                "ŽINGSNIS 1: Nustatykite mastelį!\n"
-                "Spustelkite ant mastelio linijos pradžios, o po to – ant pabaigos."
-            )
+            title_text = _('sam_step1_title', "STEP 1: Set the scale!\nClick on the start of the scale line, then on the end.")
             self.ax2d.set_title(title_text, fontsize=12, pad=10, color='red', fontweight='bold')
             
         self.ax2d.axis('off')
@@ -281,7 +275,7 @@ class SAMAutomaticAnalyzer:
                     multimask_output=True
                 )
             
-            for masks_np, scores_np, _ in results:
+            for masks_np, scores_np, _ignore in results:
                 best_idx = int(np.argmax(scores_np))
                 all_masks_np.append(masks_np[best_idx].astype(bool))
                 all_scores_np.append(float(scores_np[best_idx]))
@@ -362,7 +356,7 @@ class SAMAutomaticAnalyzer:
             eq_diameter = 2 * np.sqrt(area_um2 / np.pi)
             if area_um2 < 0.01: continue # Per maži (šiukšlės)
             
-            contours, _ = cv2.findContours(mask_uint8, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            contours, _ignore = cv2.findContours(mask_uint8, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
             if contours:
                 cnt = contours[0]
                 perimeter_pixels = cv2.arcLength(cnt, True)
@@ -443,25 +437,28 @@ class SAMAutomaticAnalyzer:
             aspects = [s['Aspect_Ratio'] for s in stats_list]
             roughness_Ra = [s['Ra_um'] for s in stats_list]
             
-            fracture_type = ("Stipriai Intergranuliarinis" if fracture_index > 0.5
-                             else "Transgranuliarinis" if fracture_index < -0.5
-                             else "Mišrus")
+            fracture_type_key = ("fracture_Stipriai_Intergranuliarinis" if fracture_index > 0.5
+                                 else "fracture_Transgranuliarinis" if fracture_index < -0.5
+                                 else "fracture_Mišrus")
+            fracture_type = _(fracture_type_key, "Mixed")
+            
+            units_vnt = _("sam_units_vnt", "pcs.")
             
             self._global_stats = {
-                "Algoritmas":          "SAM 3.1 Multiplex",
-                "Grūdelių skaičius":   f"{len(stats_list)} vnt.",
-                "Vid. diametras":      f"{np.mean(diams):.2f} µm",
-                "Min diametras":       f"{np.min(diams):.2f} µm",
-                "Max diametras":       f"{np.max(diams):.2f} µm",
-                "Vid. plotas":         f"{np.mean(areas):.2f} µm²",
-                "Min plotas":          f"{np.min(areas):.2f} µm²",
-                "Max plotas":          f"{np.max(areas):.2f} µm²",
-                "Vid. anizotropija":   f"{np.mean(aspects):.3f} [be vnt.]",
-                "Vid. sferiškumas":    f"{np.mean(sphericities):.3f} [be vnt.]",
-                "Ribų tankis":         f"{grain_boundary_density:.4f} µm⁻¹",
-                "Vid. Ra":             f"{np.mean(roughness_Ra):.4f} µm",
-                "Lūžio indeksas":      f"{fracture_index:.4f} µm",
-                "Lūžio tipas":         fracture_type,
+                _("sam_stat_algorithm", "Algorithm"):          "SAM 3.1 Multiplex",
+                _("sam_stat_count", "Grain Count"):   f"{len(stats_list)} {units_vnt}",
+                _("sam_stat_mean_diam", "Mean Diameter"):      f"{np.mean(diams):.2f} µm",
+                _("sam_stat_min_diam", "Min Diameter"):       f"{np.min(diams):.2f} µm",
+                _("sam_stat_max_diam", "Max Diameter"):       f"{np.max(diams):.2f} µm",
+                _("sam_stat_mean_area", "Mean Area"):         f"{np.mean(areas):.2f} µm²",
+                _("sam_stat_min_area", "Min Area"):          f"{np.min(areas):.2f} µm²",
+                _("sam_stat_max_area", "Max Area"):          f"{np.max(areas):.2f} µm²",
+                _("sam_stat_aspect", "Mean Anisotropy"):   f"{np.mean(aspects):.3f}",
+                _("sam_stat_sphericity", "Mean Sphericity"):    f"{np.mean(sphericities):.3f}",
+                _("sam_stat_gb_density", "GB Density"):         f"{grain_boundary_density:.4f} µm⁻¹",
+                _("sam_stat_roughness", "Mean Ra"):             f"{np.mean(roughness_Ra):.4f} µm",
+                _("sam_stat_fracture_idx", "Fracture Index"):      f"{fracture_index:.4f} µm",
+                _("sam_stat_fracture_type", "Fracture Type"):         fracture_type,
             }
             
             for k, v in self._global_stats.items():
@@ -876,7 +873,7 @@ class InteractiveSAMCorrector:
         self.selected_indices = []
         
         self.fig, self.ax = plt.subplots(figsize=(14, 12))
-        self.fig.canvas.manager.set_window_title("SAM 3.1 Rankinis Koregavimas")
+        self.fig.canvas.manager.set_window_title(_("sam_window_title_manual", "SAM 3.1 Manual Adjustment"))
         
         self.cid_click = self.fig.canvas.mpl_connect('button_press_event', self.on_click)
         self.cid_key = self.fig.canvas.mpl_connect('key_press_event', self.on_key)
@@ -888,15 +885,15 @@ class InteractiveSAMCorrector:
         
         # Sukuriame papildomas ašis mygtukams (pos: [left, bottom, width, height])
         ax_repeat = self.fig.add_axes([0.02, 0.01, 0.15, 0.04])
-        self.btn_repeat = Button(ax_repeat, '🔄 Pakartoti aptikimą', color='#E3F2FD', hovercolor='#BBDEFB')
+        self.btn_repeat = Button(ax_repeat, _("sam_btn_repeat", "🔄 Repeat detection"), color='#E3F2FD', hovercolor='#BBDEFB')
         self.btn_repeat.on_clicked(self.on_repeat_clicked)
         
         ax_roi = self.fig.add_axes([0.18, 0.01, 0.15, 0.04])
-        self.btn_roi = Button(ax_roi, '✂️ Iš naujo sritį', color='#FFF9C4', hovercolor='#FFF176')
+        self.btn_roi = Button(ax_roi, _("sam_btn_roi", "✂️ New region (ROI)"), color='#FFF9C4', hovercolor='#FFF176')
         self.btn_roi.on_clicked(self.on_roi_clicked)
         
         ax_export = self.fig.add_axes([0.34, 0.01, 0.15, 0.04])
-        self.btn_export = Button(ax_export, '📷 PNG eksportas', color='#E8F5E9', hovercolor='#C8E6C9')
+        self.btn_export = Button(ax_export, _("sam_btn_save_png_short", "📷 Save PNG"), color='#E8F5E9', hovercolor='#C8E6C9')
         self.btn_export.on_clicked(self.on_export_clicked)
         
         self.render()
@@ -928,12 +925,12 @@ class InteractiveSAMCorrector:
             
             # Pažymime mygtuką žaliai kaip sėkmės ženklą
             self.btn_export.ax.set_facecolor('#4CAF50') 
-            self.btn_export.label.set_text("✅ IŠSAUGOTA")
+            self.btn_export.label.set_text(_("sam_btn_saved_status", "✅ SAVED"))
             self.fig.canvas.draw()
             
             # Po sekundės grąžiname pradinį tekstą (spalvą paliekame žalią iki kito veiksmo)
             plt.pause(1.5)
-            self.btn_export.label.set_text("📷 PNG eksportas")
+            self.btn_export.label.set_text(_("sam_btn_save_png_short", "📷 Save PNG"))
             self.fig.canvas.draw()
             
         except Exception as e:
@@ -983,11 +980,11 @@ class InteractiveSAMCorrector:
             else:
                 self.base_img_obj.set_data(display_img)
             
-            self.ax.set_title(f"Apdorotoje srityje rasta grūdelių: {len(self.masks)}", 
+            self.ax.set_title(_("sam_manual_title_format", "Grains found in the processed region: {len_masks}").format(len_masks=len(self.masks)), 
                               fontsize=13, fontweight='bold', color='#1A237E', pad=15)
             
             # Visa informacija apačioje
-            full_info = "RANKINIS APDOROJIMAS  |  [J] Sujungti  |  [D] Ištrinti  |  [S] Perskirti  |  [ESC] Baigti"
+            full_info = _("sam_manual_info_bar", "MANUAL PROCESSING  |  [J] Merge  |  [D] Delete  |  [S] Split  |  [ESC] Exit")
             
             self.info_text_obj = self.ax.text(0.5, -0.02, full_info, transform=self.ax.transAxes, 
                          ha='center', va='top', fontsize=11, fontweight='bold', 
@@ -1034,7 +1031,7 @@ class InteractiveSAMCorrector:
 
     def merge_selected(self):
         if len(self.selected_indices) < 2: 
-            print("Pasirinkite bent 2 grūdelius sujungimui!", flush=True)
+            print(_("sam_merge_warning", "Select at least 2 grains for merging!"), flush=True)
             return
         print(f"Sujungiami grūdeliai: {[i+1 for i in self.selected_indices]}", flush=True)
         new_mask_bool = np.zeros_like(self.masks[0]['segmentation'], dtype=bool)
@@ -1064,7 +1061,7 @@ class InteractiveSAMCorrector:
     def split_selected(self):
         idx = self.selected_indices[0]
         mask_bool = self.masks[idx]['segmentation']
-        print(f"Perskiriamas grūdelis {idx+1}. Pažymėkite du taškus centre naujų dalių.", flush=True)
+        print(_("sam_split_prompt", "Splitting grain {idx}. Mark two points in the center of the new parts.").format(idx=idx+1), flush=True)
         pts = plt.ginput(2, timeout=0)
         if len(pts) < 2: return
         
@@ -1074,7 +1071,7 @@ class InteractiveSAMCorrector:
         
         new_masks = []
         for pt in pts:
-            m, scores, _ = predictor.predict(
+            m, scores, _ignore = predictor.predict(
                 point_coords=np.array([pt]),
                 point_labels=np.array([1]),
                 multimask_output=True
@@ -1116,9 +1113,16 @@ if __name__ == "__main__":
         root = tk.Tk()
         root.withdraw()
         root.attributes('-topmost', True)
+        
+        init_dir = get_config_val('default_sem_folder', '')
+        import os
+        if not init_dir or not os.path.exists(init_dir):
+            init_dir = None
+            
         IMAGE_PATH = filedialog.askopenfilename(
-            title="Pasirinkite SEM nuotrauką analizei",
-            filetypes=[("Nuotraukos", "*.tif *.tiff *.png *.jpg *.jpeg")]
+            title=_("sam_select_image_title", "Select SEM image for analysis"),
+            filetypes=[(_("sam_image_filetype_desc", "Images"), "*.tif *.tiff *.png *.jpg *.jpeg")],
+            initialdir=init_dir
         )
         root.destroy()
         

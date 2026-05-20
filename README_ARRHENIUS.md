@@ -2,13 +2,13 @@
 ### Aktyvacijos Energijos ir Joninio Laidumo Modulis (`CeraMIS`)
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg?logo=python&logoColor=white)](https://www.python.org/)
-[![dearEIS Core](https://img.shields.io/badge/dearEIS-Integration-red.svg)](https://github.com/kbknudsen/PyEIS)
+[![dearEIS Core](https://img.shields.io/badge/dearEIS-Integration-red.svg)](https://github.com/vyrjana/DearEIS)
 [![Math Fitting](https://img.shields.io/badge/Regression-SciPy%20Stats-green.svg)](https://scipy.org/)
 [![Units](https://img.shields.io/badge/Notation-Scientific%20(Unicode)-orange.svg)](https://en.wikipedia.org/wiki/Scientific_notation)
 
 ---
 
-**Arenijaus Analizės modulis** – tai elektrocheminis posistemis, integruotas į pagrindinę LLTO tyrimų programą. Jis yra skirtas apskaičiuoti kietųjų elektrolitų ličio jonų pernašos aktyvacijos energiją ($E_a$) bei ekstrapoliuoti joninio laidumo vertes ($\sigma$) pasirinktose temperatūrose, tiesiogiai importuojant išanalizuotus elektrocheminio impedanso spektroskopijos (EIS) projektus iš dearEIS sistemos.
+**Arenijaus Analizės modulis** – tai elektrocheminis posistemis, integruotas į pagrindinę LLTO tyrimų programą. Jis yra skirtas apskaičiuoti kietųjų elektrolitų ličio jonų pernašos aktyvacijos energiją ($E_ {a}$) bei ekstrapoliuoti joninio laidumo vertes ($\sigma$) pasirinktose temperatūrose, tiesiogiai importuojant išanalizuotus elektrocheminio impedanso spektroskopijos (EIS) projektus iš [dearEIS](https://github.com/vyrjana/DearEIS) sistemos.
 
 ---
 

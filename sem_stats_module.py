@@ -33,6 +33,8 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolb
 from scipy.stats import gaussian_kde
 from scipy.signal import find_peaks
 
+from language_driver import _, get_config_val
+
 # ─── Stulpelių sinonimų žodynas ────────────────────────────────────────────────
 _COL_SYNONYMS = {
     "diameter":   ["equiv. diameter", "eqdiameter", "diameter", "feret",
@@ -84,11 +86,11 @@ def _build_gui(app):
     # ── Antraštė ──────────────────────────────────────────────────────────────
     hdr = tk.Frame(parent, bg="#1A237E", pady=8)
     hdr.pack(fill=tk.X)
-    tk.Label(hdr, text="\U0001f4ca  LLTO SEM Vaizdų bendra Statistinė Analizė",
+    tk.Label(hdr, text=_('sem_stats_header', "\U0001f4ca  LLTO SEM Vaizdų bendra Statistinė Analizė"),
              bg="#1A237E", fg="white",
              font=("Segoe UI", 13, "bold")).pack()
     tk.Label(hdr,
-             text="Apjungia iki 10 Excel failų grūdelių duomenis ir atlieka pilną statistiką",
+             text=_('sem_stats_header_desc', "Apjungia iki 10 Excel failų grūdelių duomenis ir atlieka pilną statistiką"),
              bg="#1A237E", fg="#C5CAE9",
              font=("Segoe UI", 9)).pack()
 
@@ -100,7 +102,7 @@ def _build_gui(app):
     left.pack(side=tk.LEFT, fill=tk.Y, padx=(0, 8))
 
     # Failų sąrašas
-    files_lf = tk.LabelFrame(left, text="Excel failai (iki 10)", padx=6, pady=6,
+    files_lf = tk.LabelFrame(left, text=_('sem_stats_excel_files_title', "Excel failai (iki 10)"), padx=6, pady=6,
                               font=("Segoe UI", 9, "bold"))
     files_lf.pack(fill=tk.X, pady=(0, 6))
 
@@ -115,33 +117,33 @@ def _build_gui(app):
 
     fb = tk.Frame(left)
     fb.pack(fill=tk.X, pady=3)
-    tk.Button(fb, text="\u2795 Pridėti failus",
+    tk.Button(fb, text=_('sem_stats_add_files_btn', "\u2795 Pridėti failus"),
               command=lambda: _add_files(app),
               bg="#1976D2", fg="white",
               font=("Segoe UI", 9, "bold"), width=15).pack(side=tk.LEFT, padx=2)
-    tk.Button(fb, text="\U0001f5d1 Pašalinti",
+    tk.Button(fb, text=_('sem_stats_remove_btn', "\U0001f5d1 Pašalinti"),
               command=lambda: _remove_files(app),
               bg="#C62828", fg="white",
               font=("Segoe UI", 9, "bold"), width=12).pack(side=tk.LEFT, padx=2)
-    tk.Button(fb, text="\u2716 Išvalyti viską",
+    tk.Button(fb, text=_('sem_stats_clear_all_btn', "\u2716 Išvalyti viską"),
               command=lambda: _clear_files(app),
               bg="#555", fg="white",
               font=("Segoe UI", 9, "bold"), width=14).pack(side=tk.LEFT, padx=2)
 
     # Stulpelių priskyrimas
-    col_lf = tk.LabelFrame(left, text="Stulpelių priskyrimas",
+    col_lf = tk.LabelFrame(left, text=_('sem_stats_col_mapping_title', "Stulpelių priskyrimas"),
                             padx=6, pady=6,
                             font=("Segoe UI", 9, "bold"))
     col_lf.pack(fill=tk.X, pady=(0, 6))
 
     col_defs = [
-        ("diameter",   "Ekv. diametras, µm:"),
-        ("area",       "Plotas, µm²:"),
-        ("ff",         "Sferiškumas (Form factor):"),
-        ("aspect",     "Anizotropija (Aspect):"),
-        ("perimeter",  "Perimetras, µm:"),
-        ("area_3d",    "3D Plotas, µm²:"),
-        ("roughness",  "Pavirš. šiurkštumas Ra (mikro):"),
+        ("diameter",   _('sem_stats_col_diameter', "Ekv. diametras, µm:")),
+        ("area",       _('sem_stats_col_area', "Plotas, µm²:")),
+        ("ff",         _('sem_stats_col_ff', "Sferiškumas (Form factor):")),
+        ("aspect",     _('sem_stats_col_aspect', "Anizotropija (Aspect):")),
+        ("perimeter",  _('sem_stats_col_perimeter', "Perimetras, µm:")),
+        ("area_3d",    _('sem_stats_col_area_3d', "3D Plotas, µm²:")),
+        ("roughness",  _('sem_stats_col_roughness', "Pavirš. šiurkštumas Ra (mikro):")),
     ]
     for key, label in col_defs:
         row_f = tk.Frame(col_lf)
@@ -155,28 +157,28 @@ def _build_gui(app):
         cb.pack(side=tk.LEFT, padx=3)
         setattr(app, f"_sem_cb_{key}", cb)
 
-    tk.Button(left, text="\U0001f50d Aptikti stulpelius automatiškai",
+    tk.Button(left, text=_('sem_stats_auto_detect_btn', "\U0001f50d Aptikti stulpelius automatiškai"),
               command=lambda: _auto_detect_cols(app),
               bg="#00695C", fg="white",
               font=("Segoe UI", 9, "bold")).pack(fill=tk.X, pady=3)
 
     # Analizės mygtukai
-    tk.Button(left, text="\u25b6  PRADĖTI ANALIZĘ",
+    tk.Button(left, text=_('sem_stats_run_btn', "\u25b6  PRADĖTI ANALIZĘ"),
               command=lambda: _run_analysis(app),
               bg="#2E7D32", fg="white",
               font=("Segoe UI", 11, "bold"), pady=8).pack(fill=tk.X, pady=4)
-    tk.Button(left, text="\U0001f4c8 Bimodalė histograma + KDE",
+    tk.Button(left, text=_('sem_stats_plot_btn', "\U0001f4c8 Bimodalė histograma + KDE"),
               command=lambda: _show_histogram(app),
               bg="#6A1B9A", fg="white",
               font=("Segoe UI", 9, "bold")).pack(fill=tk.X, pady=2)
-    tk.Button(left, text="\U0001f4be Eksportuoti rezultatus (.xlsx)",
+    tk.Button(left, text=_('sem_stats_export_btn', "\U0001f4be Eksportuoti rezultatus (.xlsx)"),
               command=lambda: _export_results(app),
               bg="#E65100", fg="white",
               font=("Segoe UI", 9, "bold")).pack(fill=tk.X, pady=2)
 
     # Statusas
     app.sem_status_var = tk.StringVar(
-        value="Įkelkite Excel failus ir pradėkite analizę.")
+        value=_('sem_stats_status_init', "Įkelkite Excel failus ir pradėkite analizę."))
     tk.Label(left, textvariable=app.sem_status_var,
              fg="#1565C0", font=("Segoe UI", 8, "italic"),
              wraplength=350, justify="left").pack(anchor="w", pady=4)
@@ -185,7 +187,7 @@ def _build_gui(app):
     right = tk.Frame(body)
     right.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
-    res_lf = tk.LabelFrame(right, text="Statistikos rezultatai",
+    res_lf = tk.LabelFrame(right, text=_('sem_stats_results_title', "Statistikos rezultatai"),
                             padx=4, pady=4,
                             font=("Segoe UI", 9, "bold"))
     res_lf.pack(fill=tk.BOTH, expand=True)
@@ -195,7 +197,12 @@ def _build_gui(app):
     style.configure("Treeview", rowheight=30, font=("Segoe UI", 9))
     style.configure("Treeview.Heading", font=("Segoe UI", 9, "bold"))
 
-    tree_cols = ("Parametras", "Vidurkis \u00b1 St.nuokrypis", "Vienetai", "N")
+    tree_cols = (
+        _('sem_stats_tbl_param', "Parametras"), 
+        _('sem_stats_tbl_mean_std', "Vidurkis \u00b1 St.nuokrypis"), 
+        _('sem_stats_tbl_units', "Vienetai"), 
+        "N"
+    )
     app.sem_results_tree = ttk.Treeview(res_lf, columns=tree_cols,
                                          show="headings", height=30)
     col_widths = [260, 200, 100, 60]
@@ -221,14 +228,25 @@ def _build_gui(app):
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def _add_files(app):
+    init_dir = get_config_val('default_sem_stats_folder', '')
+    if not init_dir or not os.path.exists(init_dir):
+        init_dir = None
+        
     paths = filedialog.askopenfilenames(
-        title="Pasirinkite SEM duomenų failus (Excel arba CSV)",
-        filetypes=[("Duomenų failai", "*.xlsx *.xls *.csv"), ("Excel", "*.xlsx *.xls"), ("CSV", "*.csv"), ("Visi failai", "*.*")])
+        title=_('sem_stats_select_files_title', "Pasirinkite SEM duomenų failus (Excel arba CSV)"),
+        filetypes=[
+            (_('sem_stats_filetype_data', "Duomenų failai"), "*.xlsx *.xls *.csv"), 
+            (_('sem_stats_filetype_excel', "Excel"), "*.xlsx *.xls"), 
+            (_('sem_stats_filetype_csv', "CSV"), "*.csv"), 
+            (_('sem_stats_filetype_all', "Visi failai"), "*.*")
+        ],
+        initialdir=init_dir
+    )
     for p in paths:
         if p not in app.sem_stats_state['files']:
             if len(app.sem_stats_state['files']) >= 10:
-                messagebox.showwarning("Dėmesio",
-                                       "Galima įkelti daugiausiai 10 failų.")
+                messagebox.showwarning(_('msg_warning', "Dėmesio"),
+                                       _('sem_stats_max_files_warning', "Galima įkelti daugiausiai 10 failų."))
                 break
             app.sem_stats_state['files'].append(p)
             app.sem_files_listbox.insert(tk.END, os.path.basename(p))
@@ -249,7 +267,7 @@ def _clear_files(app):
         files=[], raw_dfs=[], combined_df=None, results={})
     for row in app.sem_results_tree.get_children():
         app.sem_results_tree.delete(row)
-    app.sem_status_var.set("Išvalyta. Įkelkite failus.")
+    app.sem_status_var.set(_('sem_stats_status_cleared', "Išvalyta. Įkelkite failus."))
 
 
 def _try_load_all(app):
@@ -267,12 +285,12 @@ def _try_load_all(app):
             errors.append(f"{os.path.basename(p)}: {e}")
     app.sem_stats_state['raw_dfs'] = dfs
     if errors:
-        messagebox.showwarning("Įkėlimo klaidos", "\n".join(errors))
+        messagebox.showwarning(_('sem_stats_load_errors_title', "Įkėlimo klaidos"), "\n".join(errors))
     if dfs:
         _auto_detect_cols(app)
         app.sem_status_var.set(
-            f"Įkelta {len(dfs)} failų. Tikrinkite stulpelių priskyrimus ir "
-            "paspauskite 'PRADĖTI ANALIZĘ'.")
+            _('sem_stats_status_loaded', "Įkelta {num} failų. Tikrinkite stulpelių priskyrimus ir paspauskite 'PRADĖTI ANALIZĘ'.").format(num=len(dfs))
+        )
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -317,8 +335,7 @@ def _auto_detect_cols(app):
         if matched: app.sem_col_vars[key].set(matched)
 
     app.sem_status_var.set(
-        "Stulpeliai aptikti. Patikrinkite priskyrimus ir "
-        "paspauskite 'PRADĖTI ANALIZĘ'.")
+        _('sem_stats_status_detected', "Stulpeliai aptikti. Patikrinkite priskyrimus ir paspauskite 'PRADĖTI ANALIZĘ'."))
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -328,16 +345,16 @@ def _auto_detect_cols(app):
 def _run_analysis(app):
     dfs = app.sem_stats_state['raw_dfs']
     if not dfs:
-        messagebox.showwarning("Dėmesio", "Pirmiausia įkelkite Excel failus.")
+        messagebox.showwarning(_('msg_warning', "Dėmesio"), _('sem_stats_no_files_warning', "Pirmiausia įkelkite Excel failus."))
         return
 
     col = {k: v.get().strip() for k, v in app.sem_col_vars.items()}
 
     # 3. Makro statistika (vidurkis per failus)
     macro_meta = {
-        "gb_density": ("Grūdelių ribų tankis", "1/\u03bcm"),
-        "roughness_macro": ("Paviršiaus šiurkštumas Ra (globalus)", "\u03bcm"),
-        "fracture":   ("Lūžio topologijos indeksas", "bvnt."),
+        "gb_density": (_('sem_stats_param_gb_density', "Grūdelių ribų tankis"), "1/\u03bcm"),
+        "roughness_macro": (_('sem_stats_param_roughness_macro', "Paviršiaus šiurkštumas Ra (globalus)"), "\u03bcm"),
+        "fracture":   (_('sem_stats_param_fracture', "Lūžio topologijos indeksas"), "bvnt."),
     }
 
     def _find_macro_val(df, param_key):
@@ -415,23 +432,23 @@ def _run_analysis(app):
     # 2. Mikro statistika
     results = {}
     micro_meta = {
-        "diameter": ("ekvivalentinio diametro", "\u03bcm"),
-        "area":     ("ploto", "\u03bcm\u00b2"),
-        "ff":       ("sferiškumo", "bvnt."),
-        "aspect":   ("anizotropijos", "bvnt."),
-        "perimeter": ("perimetro", "\u03bcm"),
-        "area_3d":  ("3D ploto", "\u03bcm\u00b2"),
-        "roughness": ("Ra šiurkštumo", "\u03bcm"),
+        "diameter": (_('sem_stats_genitive_diameter', "ekvivalentinio diametro"), "\u03bcm"),
+        "area":     (_('sem_stats_genitive_area', "ploto"), "\u03bcm\u00b2"),
+        "ff":       (_('sem_stats_genitive_ff', "sferiškumo"), "bvnt."),
+        "aspect":   (_('sem_stats_genitive_aspect', "anizotropijos"), "bvnt."),
+        "perimeter": (_('sem_stats_genitive_perimeter', "perimetro"), "\u03bcm"),
+        "area_3d":  (_('sem_stats_genitive_area_3d', "3D ploto"), "\u03bcm\u00b2"),
+        "roughness": (_('sem_stats_genitive_roughness', "Ra šiurkštumo"), "\u03bcm"),
     }
     # Pavadinimai ašims (vardininkas)
     axis_labels = {
-        "diameter": "Ekvivalentinis diametras",
-        "area": "Plotas",
-        "ff": "Sferiškumas",
-        "aspect": "Anizotropija",
-        "perimeter": "Perimetras",
-        "area_3d": "3D plotas",
-        "roughness": "Ra šiurkštumas"
+        "diameter": _('sem_stats_axis_diameter', "Ekvivalentinis diametras"),
+        "area": _('sem_stats_axis_area', "Plotas"),
+        "ff": _('sem_stats_axis_ff', "Sferiškumas"),
+        "aspect": _('sem_stats_axis_aspect', "Anizotropija"),
+        "perimeter": _('sem_stats_axis_perimeter', "Perimetras"),
+        "area_3d": _('sem_stats_axis_area_3d', "3D plotas"),
+        "roughness": _('sem_stats_axis_roughness', "Ra šiurkštumas")
     }
 
     for k, (genitive_label, unit) in micro_meta.items():
@@ -470,7 +487,7 @@ def _run_analysis(app):
     if f_types:
         most_common = max(set(f_types), key=f_types.count)
         results["fracture_type"] = {
-            "label": "Lūžio tipas (vyraujantis)", "unit": "-",
+            "label": _('sem_stats_param_fracture_type', "Lūžio tipas (vyraujantis)"), "unit": "-",
             "mean_str": most_common, "n": len(f_types), "type": "macro"
         }
 
@@ -481,7 +498,8 @@ def _run_analysis(app):
     n_macro_types = sum(1 for r in results.values() if r['type'] == 'macro')
     
     app.sem_status_var.set(
-        f"\u2705 Analizė baigta ({len(dfs)} failai). Grūdelių: {n_micro}. Makro parametrų: {n_macro_types}.")
+        _('sem_stats_status_completed', "✅ Analizė baigta ({num} failai). Grūdelių: {micro}. Makro parametrų: {macro}.").format(num=len(dfs), micro=n_micro, macro=n_macro_types)
+    )
 
 
 def _populate_tree(app, results):
@@ -490,7 +508,7 @@ def _populate_tree(app, results):
         tree.delete(row)
 
     tree.insert("", tk.END, iid="hdr_micro",
-                values=("\u2500\u2500 MIKRO parametrai (globalus masyvas) \u2500\u2500",
+                values=(_('sem_stats_tree_hdr_micro', "── MIKRO parametrai (globalus masyvas) ──"),
                         "", "", ""),
                 tags=("section",))
     for k in ["diameter", "area", "ff", "aspect", "perimeter", "area_3d", "roughness"]:
@@ -503,7 +521,7 @@ def _populate_tree(app, results):
                         tags=("micro",))
 
     tree.insert("", tk.END, iid="hdr_macro",
-                values=("\u2500\u2500 MAKRO parametrai (vidurkis per failus) \u2500\u2500",
+                values=(_('sem_stats_tree_hdr_macro', "── MAKRO parametrai (vidurkis per failus) ──"),
                         "", "", ""),
                 tags=("section",))
     for k in ["gb_density", "roughness_macro", "fracture", "fracture_type"]:
@@ -526,19 +544,20 @@ def _show_histogram(app):
     results = app.sem_stats_state['results']
     if "diameter" not in results and "area" not in results:
         messagebox.showwarning(
-            "Dėmesio",
-            "Pirmiausia atlikite analizę (reikalingi 'diameter' arba 'area' duomenys).")
+            _('msg_warning', "Dėmesio"),
+            _('sem_stats_histogram_warning', "Pirmiausia atlikite analizę (reikalingi 'diameter' arba 'area' duomenys).")
+        )
         return
 
     win = tk.Toplevel(app.root)
-    win.title("Grūdelių pasiskirstymo analizė")
+    win.title(_('sem_stats_histogram_win_title', "Grūdelių pasiskirstymo analizė"))
     app.center_window(win, 950, 650)
 
     # Viršutinė juosta pasirinkimui
     top_bar = tk.Frame(win, pady=5)
     top_bar.pack(fill=tk.X)
     
-    tk.Label(top_bar, text="Pasirinkite parametrą: ", font=("Segoe UI", 9, "bold")).pack(side=tk.LEFT, padx=10)
+    tk.Label(top_bar, text=_('sem_stats_select_param', "Pasirinkite parametrą: "), font=("Segoe UI", 9, "bold")).pack(side=tk.LEFT, padx=10)
     
     # Surandame pirmą prieinamą parametrą numatytajai reikšmei
     available_micro = [k for k in ["diameter", "area", "ff", "aspect", "perimeter", "area_3d", "roughness"] if k in results]
@@ -576,12 +595,12 @@ def _show_histogram(app):
 
         # Pikai
         try:
-            peaks_idx, _ = find_peaks(y_kde, height=0.01 * y_kde.max(), distance=len(x_kde) // 20)
+            peaks_idx, _props = find_peaks(y_kde, height=0.01 * y_kde.max(), distance=len(x_kde) // 20)
             peak_vals = [x_kde[pi] for pi in peaks_idx]
             if peak_vals:
                 peaks_str = ", ".join([f"{v:.2f}" for v in peak_vals])
                 ax.axvline(peak_vals[0], color='brown', lw=1.5, linestyle='--', alpha=0.7, 
-                           label=f"Pikai: {peaks_str} {unit}")
+                           label=_('sem_stats_peaks_legend', "Pikai: {peaks} {unit}").format(peaks=peaks_str, unit=unit))
                 for pv in peak_vals[1:]:
                     ax.axvline(pv, color='brown', lw=1.5, linestyle='--', alpha=0.7)
         except: pass
@@ -589,11 +608,11 @@ def _show_histogram(app):
         mean_v = results[p_key]["mean"]
         std_v  = results[p_key]["std"]
         ax.axvline(mean_v, color='navy', lw=2.5, linestyle=':', 
-                   label=f"Vidurkis: {mean_v:.3f} \u00b1 {std_v:.3f} {unit}")
+                   label=_('sem_stats_mean_legend', "Vidurkis: {mean:.3f} \u00b1 {std:.3f} {unit}").format(mean=mean_v, std=std_v, unit=unit))
 
         ax.set_xlabel(f"{axis_label}, {unit}", fontsize=11)
-        ax.set_ylabel("Tikimybės tankis", fontsize=11)
-        ax.set_title(f"LLTO grūdelių {label} pasiskirstymas (N={len(arr)})", fontsize=12, fontweight='bold')
+        ax.set_ylabel(_('sem_stats_axis_density', "Tikimybės tankis"), fontsize=11)
+        ax.set_title(_('sem_stats_plot_title', "LLTO grūdelių {label} pasiskirstymas (N={num})").format(label=label, num=len(arr)), fontsize=12, fontweight='bold')
         ax.legend(fontsize=9, loc='upper right', framealpha=0.9)
         ax.grid(True, alpha=0.2)
         fig.tight_layout()
@@ -601,18 +620,18 @@ def _show_histogram(app):
 
     # Dinaminis radio button'ų kūrimas pagal turimus parametrus
     micro_params = {
-        "diameter": "Diametras",
-        "area": "Plotas",
-        "ff": "Sferiškumas",
-        "aspect": "Anizotropija",
-        "perimeter": "Perimetras",
-        "area_3d": "3D Plotas",
-        "roughness": "Šiurkštumas Ra"
+        "diameter": _('sem_stats_radio_diameter', "Diametras"),
+        "area": _('sem_stats_radio_area', "Plotas"),
+        "ff": _('sem_stats_radio_ff', "Sferiškumas"),
+        "aspect": _('sem_stats_radio_aspect', "Anizotropija"),
+        "perimeter": _('sem_stats_radio_perimeter', "Perimetras"),
+        "area_3d": _('sem_stats_radio_area_3d', "3D Plotas"),
+        "roughness": _('sem_stats_radio_roughness', "Šiurkštumas Ra")
     }
     
-    for key, label in micro_params.items():
+    for key, label_text in micro_params.items():
         if key in results:
-            tk.Radiobutton(top_bar, text=label, variable=param_var, value=key, 
+            tk.Radiobutton(top_bar, text=label_text, variable=param_var, value=key, 
                            command=update_plot, font=("Segoe UI", 9)).pack(side=tk.LEFT, padx=5)
 
     fig = Figure(figsize=(8.5, 5.5), dpi=100, facecolor="white")
@@ -632,13 +651,13 @@ def _show_histogram(app):
 def _export_results(app):
     results = app.sem_stats_state['results']
     if not results:
-        messagebox.showwarning("Dėmesio", "Pirmiausia atlikite analizę.")
+        messagebox.showwarning(_('msg_warning', "Dėmesio"), _('sem_stats_no_results_warning', "Pirmiausia atlikite analizę."))
         return
     out = filedialog.asksaveasfilename(
-        title="Išsaugoti SEM statistiką",
+        title=_('sem_stats_export_title', "Išsaugoti SEM statistiką"),
         defaultextension=".xlsx",
         initialfile="LLTO_SEM_statistika.xlsx",
-        filetypes=[("Excel failas", "*.xlsx"), ("Visi failai", "*.*")])
+        filetypes=[(_('sem_stats_filetype_excel', "Excel failas"), "*.xlsx"), (_('sem_stats_filetype_all', "Visi failai"), "*.*")])
     if not out:
         return
     rows = []
@@ -655,18 +674,21 @@ def _export_results(app):
             combined = f"{m_val:.4f} \u00b1 {s_val:.4f}"
 
         rows.append({
-            "Parametras":              r["label"],
-            "Vidurkis":                m_val,
-            "Standartinis nuokrypis":  s_val,
-            "Vidurkis \u00b1 St.nuokrypis": combined,
-            "Vienetai":                r["unit"],
+            _('sem_stats_tbl_param', "Parametras"):              r["label"],
+            _('sem_stats_col_mean', "Vidurkis"):                m_val,
+            _('sem_stats_col_std', "Standartinis nuokrypis"):  s_val,
+            _('sem_stats_tbl_mean_std', "Vidurkis \u00b1 St.nuokrypis"): combined,
+            _('sem_stats_tbl_units', "Vienetai"):                r["unit"],
             "N":                       r["n"],
-            "Tipas":                   r["type"],
+            _('sem_stats_col_type', "Tipas"):                   r["type"],
         })
     df_out = pd.DataFrame(rows)
-    with pd.ExcelWriter(out, engine='openpyxl') as writer:
-        df_out.to_excel(writer, sheet_name="Statistika", index=False)
-        cdf = app.sem_stats_state.get('combined_df')
-        if cdf is not None and not cdf.empty:
-            cdf.to_excel(writer, sheet_name="Apjungti_duomenys", index=False)
-    messagebox.showinfo("Sėkmė", f"Rezultatai išsaugoti:\n{out}")
+    try:
+        with pd.ExcelWriter(out, engine='openpyxl') as writer:
+            df_out.to_excel(writer, sheet_name=_('sem_stats_sheet_stats', "Statistika"), index=False)
+            cdf = app.sem_stats_state.get('combined_df')
+            if cdf is not None and not cdf.empty:
+                cdf.to_excel(writer, sheet_name=_('sem_stats_sheet_combined', "Apjungti_duomenys"), index=False)
+        messagebox.showinfo(_('msg_success', "Sėkmė"), _('sem_stats_export_success_msg', "Rezultatai išsaugoti:\n{}").format(out))
+    except Exception as e:
+        messagebox.showerror(_('msg_error', "Klaida"), _('sem_stats_export_error_msg', "Nepavyko išsaugoti failo:\n{}").format(e))

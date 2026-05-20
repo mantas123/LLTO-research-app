@@ -30,10 +30,14 @@ Desktop.ini
 
 
 # Git Helper Scripts
-git_update.bat
 git_setup.bat
+
+# User local configuration
+config.ini
+.cache/
 
 # Other unnecessary files
 *.log
 *.tmp
 .vscode/
+.idea/

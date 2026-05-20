@@ -17,6 +17,7 @@ import pyvista as pv
 import tempfile
 import os
 import re
+from language_driver import _
 
 def to_sci_unicode(value):
     """Konvertuoja skaičių į 10ⁿ formatą su Unicode laipsniais ir kableliu."""
@@ -62,10 +63,16 @@ def main():
     plotter.add_axes() # Pridedame ašių indikatorių
 
     titles = [
-        "3D Naikvisto-Bodė spiralė", "Naikvisto evoliucija", "Cole-Cole 3D", "Fazės kampo 3D (-Θ)",
-        "3D Kintamosios Srovės Laidumas", "Elektrinio Modulio Paviršius (M'')", 
-        "Pseudo-DRT Temperatūrinis Reljefas", "Laidumo Žemėlapis (1000/T)",
-        "Normalizuotas Z'' paviršius", "Normalizuotas M'' paviršius"
+        _("title_3d_nyquist_bode_spiral", "3D Nyquist-Bode Spiral"),
+        _("title_nyquist_evolution", "Nyquist Evolution vs Temperature"),
+        _("title_cole_cole_3d", "Cole-Cole 3D (ε' vs ε'' vs T)"),
+        _("title_phase_angle_3d", "Phase Angle 3D (-Θ)"),
+        _("title_3d_ac_conductivity", "3D AC Conductivity Surface"),
+        _("title_electric_modulus_surface", "Electric Modulus Surface (M'')"),
+        _("title_pseudo_drt_relief", "Pseudo-DRT Temperature Relief"),
+        _("title_conductivity_map", "Conductivity Map (1000/T)"),
+        _("title_norm_z_surface", "Normalized Z'' Surface"),
+        _("title_norm_m_surface", "Normalized M'' Surface")
     ]
 
     def apply_cube_aspect(x_arr, y_arr, z_arr):
@@ -94,6 +101,7 @@ def main():
         Z_s, z_mul = get_auto_scale(Z)
         
         all_blocks = pv.MultiBlock()
+        scalar_name = _('label_temp_k', "Temperature, K")
         for i, temp in enumerate(temps_valid):
             pts = np.column_stack((X_s[i], Y_s[i], Z_s[i]))
             valid_idx = ~np.isnan(pts).any(axis=1)
@@ -102,12 +110,12 @@ def main():
                 
             pd = pv.PolyData(pts)
             pd.lines = np.hstack([[len(pts)] + list(range(len(pts)))])
-            pd.point_data['Temperatūra, K'] = np.full(len(pts), temp)
+            pd.point_data[scalar_name] = np.full(len(pts), temp)
             all_blocks.append(pd)
             
         merged = all_blocks.combine()
         apply_cube_aspect(X_s, Y_s, Z_s)
-        plotter.add_mesh(merged, scalars='Temperatūra, K', cmap='inferno', line_width=4, render_lines_as_tubes=True, show_scalar_bar=False)
+        plotter.add_mesh(merged, scalars=scalar_name, cmap='inferno', line_width=4, render_lines_as_tubes=True, show_scalar_bar=False)
         plotter.show_bounds(all_edges=False, grid=True, 
                             xtitle=xlabel + x_mul, ytitle=ylabel + y_mul, ztitle=zlabel + z_mul, 
                             font_size=10, fmt="%.2f")
@@ -130,30 +138,30 @@ def main():
                             font_size=10, fmt="%.2f")
 
     if plot_id == 0:
-        Z = np.array([np.full_like(Z_real_grid[0], log_f_common) for _ in temps_valid])
-        build_lines(Z_real_grid, -Z_imag_grid, Z, "Z', Ω·m", "-Z'', Ω·m", "log(f), Hz")
+        Z = np.array([np.full_like(Z_real_grid[0], log_f_common) for _ignore in temps_valid])
+        build_lines(Z_real_grid, -Z_imag_grid, Z, _('axis_real_z_norm', "Z', Ω·m"), _('axis_imag_z_norm', "-Z'', Ω·m"), _('axis_log_f', "log(f), Hz"))
     elif plot_id == 1:
         Z = np.array([np.full_like(Z_real_grid[i], temp) for i, temp in enumerate(temps_valid)])
-        build_lines(Z_real_grid, -Z_imag_grid, Z, "Z', Ω·m", "-Z'', Ω·m", "T, K")
+        build_lines(Z_real_grid, -Z_imag_grid, Z, _('axis_real_z_norm', "Z', Ω·m"), _('axis_imag_z_norm', "-Z'', Ω·m"), _('label_temp_k', "T, K"))
     elif plot_id == 2:
         Z = np.array([np.full_like(Ep_grid[i], temp) for i, temp in enumerate(temps_valid)])
-        build_lines(Ep_grid, Edp_grid, Z, "ε', vnt.", "ε'', vnt.", "T, K")
+        build_lines(Ep_grid, Edp_grid, Z, _('axis_real_eps_unit', "ε', arb. units"), _('axis_imag_eps_unit', "ε'', arb. units"), _('label_temp_k', "T, K"))
     elif plot_id == 3:
         X = np.array([np.full_like(Th_grid[i], log_f_common) for i in range(len(temps_valid))])
         Z = np.array([np.full_like(Th_grid[i], temp) for i, temp in enumerate(temps_valid)])
-        build_lines(X, Th_grid, Z, "log(f), Hz", "-Θ, °", "T, K")
+        build_lines(X, Th_grid, Z, _('axis_log_f', "log(f), Hz"), _('axis_phase_angle_short', "-Θ, °"), _('label_temp_k', "T, K"))
     elif plot_id == 4:
-        build_surface(F_grid, T_grid, Sigma_grid, "log(f), Hz", "T, K", "log(σ'), S/m", "log(σ')")
+        build_surface(F_grid, T_grid, Sigma_grid, _('axis_log_f', "log(f), Hz"), _('label_temp_k', "T, K"), _('axis_conductivity_surface', "log(σ'), S/m"), "log(σ')")
     elif plot_id == 5:
-        build_surface(F_grid, T_grid, M_imag_grid, "log(f), Hz", "T, K", "M'', vnt.", "M''")
+        build_surface(F_grid, T_grid, M_imag_grid, _('axis_log_f', "log(f), Hz"), _('label_temp_k', "T, K"), _('axis_imag_m_unit', "M'', arb. units"), "M''")
     elif plot_id == 6:
-        build_surface(F_grid, T_grid, Pseudo_drt_grid, "log(f), Hz", "T, K", "-dZ'/d(log f)", "DRT")
+        build_surface(F_grid, T_grid, Pseudo_drt_grid, _('axis_log_f', "log(f), Hz"), _('label_temp_k', "T, K"), _('axis_pseudo_drt_value', "-dZ'/d(log f)"), "DRT")
     elif plot_id == 7:
-        build_surface(F_grid, T_inv_grid, Sigma_grid, "log(f), Hz", "1000/T, K⁻¹", "log(σ'), S/m", "log(σ')")
+        build_surface(F_grid, T_inv_grid, Sigma_grid, _('axis_log_f', "log(f), Hz"), _('axis_inv_temp', "1000/T, K⁻¹"), _('axis_conductivity_surface', "log(σ'), S/m"), "log(σ')")
     elif plot_id == 8:
-        build_surface(F_grid, T_grid, data['Z_norm_grid'], "log(f), Hz", "T, K", "Z''/Z''max", "Z_norm")
+        build_surface(F_grid, T_grid, data['Z_norm_grid'], _('axis_log_f', "log(f), Hz"), _('label_temp_k', "T, K"), _('axis_norm_z_spec', "Z''/Z''max"), "Z_norm")
     elif plot_id == 9:
-        build_surface(F_grid, T_grid, data['M_norm_grid'], "log(f), Hz", "T, K", "M''/M''max", "M_norm")
+        build_surface(F_grid, T_grid, data['M_norm_grid'], _('axis_log_f', "log(f), Hz"), _('label_temp_k', "T, K"), _('axis_norm_m_spec', "M''/M''max"), "M_norm")
 
     if 0 <= plot_id < len(titles):
         plotter.add_text(titles[plot_id], position='upper_edge', font_size=14, color='black')

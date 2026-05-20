@@ -66,11 +66,11 @@ graph TD
     E --> F[5. Braižyti plot_surface su viridis spalvinimu]
 ```
 
-1.  **Interpoliacijos būtinybė**: Kadangi skirtingose temperatūrose dearEIS eksperimento dažnių taškai skiriasi, tiesiogiai sujungti jų į tinklelį neįmanoma.
+1.  **Interpoliacijos būtinybė**: Kadangi skirtingose temperatūrose [dearEIS](https://github.com/vyrjana/DearEIS) eksperimento dažnių taškai skiriasi, tiesiogiai sujungti jų į tinklelį neįmanoma.
 2.  **Dažnių tinklelis**: Sukuriamas vienodas geometrinis logaritminis dažnių tinklelis nuo minimalaus iki maksimalaus dažnio:
     `np.geomspace(f_min, f_max, 200)`
 3.  **Interpoliavimas**: Kiekvienam temperatūros pavyzdžiui DRT reikšmės $\gamma$ yra interpoliuojamos išilgai dažnio ašies:
-    $$\gamma_T(f) = \text{interp1d}(\log_{10} f_{\text{original}}, \gamma_{\text{original}})(\log_{10} f)$$
+    $$\gamma_ {T}(f) = \text{interp1d}(\log_ {10} f_ {\text{original}}, \gamma_ {\text{original}})(\log_ {10} f)$$
 4.  **Tinklelio formavimas**: Gauti duomenys sudedami į 2D matricas $X$ (dažnis), $Y$ (temperatūra) ir $Z$ (DRT intensyvumas $\gamma$) ir atvaizduojami naudojant trimatį paviršinį braižytuvą (`ax.plot_surface`).
 
 ---
@@ -90,9 +90,9 @@ $$z_ {\text{um}} = I(x, y) \times \frac{w}{255} \times 0.1 \times \text{scale}$$
 #### 2. 3D Paviršiaus Plotas ($A_ {3D}$):
 Kiekvieno grūdelio realus trimatis plotas skaičiuojamas skaitmeniškai integruojant erdvinį gradientą per visą grūdelio kaukės sritį:
 
-$$A_ {3D} = \iint_ {\text{Mask}} \sqrt{1 + \left(\frac{\partial z}{\partial x}\right)^2 + \left(\frac{\partial z}{\partial y}\right)^2} \,dx\,dy$$
+$$A_ {3D} = \iint_ {\text{Mask}} \sqrt{1 + \left(\partial z / \partial x\right)^2 + \left(\partial z / \partial y\right)^2} \,dx\,dy$$
 
-*(išvestinės $\frac{\partial z}{\partial x}$ ir $\frac{\partial z}{\partial y}$ apskaičiuojamos naudojant antros eilės centrinių skirtumų metodą `np.gradient`).*
+*(išvestinės $\partial z / \partial x$ ir $\partial z / \partial y$ apskaičiuojamos naudojant antros eilės centrinių skirtumų metodą `np.gradient`).*
 
 #### 3. Šiurkštumo ($R_ {a}$, $R_ {q}$) skaičiavimas:
 Paviršiaus šiurkštumas skaičiuojamas visam pavyzdžiui (globalus) arba kiekvienam AI segmentuotam grūdeliui atsektose ribose:

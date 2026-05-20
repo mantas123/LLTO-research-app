@@ -35,8 +35,8 @@ graph TD
     $$z_ {\text{um}} = I(x, y) \times \frac{w}{255} \times 0.1 \times \text{scale}$$
     *(čia $I(x,y)$ yra pikselio intensyvumas, $w$ – vaizdo plotis, o `scale` – pikselio dydžio santykis su realybe).*
 *   **3D Paviršiaus Plotas**: Kiekvieno grūdelio realus trimatis plotas skaičiuojamas skaitmeniškai integruojant erdvinį gradientą per visą grūdelio kaukės sritį:
-    $$A_ {3D} = \iint_ {\text{Mask}} \sqrt{1 + \left(\frac{\partial z}{\partial x}\right)^2 + \left(\frac{\partial z}{\partial y}\right)^2} \,dx\,dy$$
-    *(išvestinės $\frac{\partial z}{\partial x}$ ir $\frac{\partial z}{\partial y}$ apskaičiuojamos naudojant antros eilės centrinių skirtumų metodą `np.gradient`).*
+    $$A_ {3D} = \iint_ {\text{Mask}} \sqrt{1 + \left(\partial z / \partial x\right)^2 + \left(\partial z / \partial y\right)^2} \,dx\,dy$$
+    *(išvestinės $\partial z / \partial x$ ir $\partial z / \partial y$ apskaičiuojamos naudojant antros eilės centrinių skirtumų metodą `np.gradient`).*
 *   **Šiurkštumas $R_ {a}$**: Skaičiuojamas kaip vidutinis absoliutus gylio verčių nuokrypis nuo grūdelio paviršiaus vidurkio:
     $$R_ {a} = \frac{1}{N}\sum_ {i=1}^{N} |z_ {i} - \bar{z}|$$
  

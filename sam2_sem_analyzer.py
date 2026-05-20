@@ -26,8 +26,8 @@ import tkinter as tk
 from tkinter import simpledialog
 import cv2
 import pyvista as pv
-from skimage.feature import peak_local_max
 import torch
+from language_driver import _, get_config_val, get_config_bool, set_config_val
 
 
 # Padėsime atsiųsti modelio svorius su progresu
@@ -147,7 +147,7 @@ class SAMAutomaticAnalyzer:
             root = tk.Tk()
             root.withdraw()
             root.attributes('-topmost', True)
-            length_um = simpledialog.askfloat("Mastelis", "Įveskite pažymėtos mastelio linijos ilgį mikrometrais (µm):", minvalue=0.001)
+            length_um = simpledialog.askfloat(_('sam_scale_win_title', "Scale"), _('sam_scale_prompt', "Enter the length of the marked scale line in micrometers (µm):"), minvalue=0.001)
             root.destroy()
             
             if length_um is not None:
@@ -161,9 +161,7 @@ class SAMAutomaticAnalyzer:
                 # Pereiname į srities (ROI) pasirinkimą
                 self.state = 'ROI'
                 self.ax2d.set_title(
-                    "ŽINGSNIS 2: Pasirinkite apdorojimo sritį!\n"
-                    "Apveskite su pele norimą sritį (kad išvengtumėte nereikalingos informacijos apačioje).\n"
-                    "Paspauskite 'Enter', kai baigsite.",
+                    _('sam_step2_title', "STEP 2: Select the processing region!\nDrag a rectangle with the mouse over the desired region.\nPress 'Enter' when done."),
                     color='blue', fontweight='bold'
                 )
                 self.roi_selector = RectangleSelector(
@@ -214,8 +212,7 @@ class SAMAutomaticAnalyzer:
             # Praleidžiame mastelio nustatymą, einame tiesiai prie ROI
             self.state = 'ROI'
             self.ax2d.set_title(
-                "PASIRINKITE APDOROJIMO SRITĮ!\n"
-                "Apveskite su pele norimą sritį ir paspauskite 'Enter'.",
+                _('sam_step2_title', "STEP 2: Select the processing region!\nDrag a rectangle with the mouse over the desired region.\nPress 'Enter' when done."),
                 color='blue', fontweight='bold', fontsize=14
             )
             self.roi_selector = RectangleSelector(
@@ -227,10 +224,7 @@ class SAMAutomaticAnalyzer:
             self.state = 'SCALE'
             self.scale_p1 = None
             self.scale_p2 = None
-            title_text = (
-                "ŽINGSNIS 1: Nustatykite mastelį!\n"
-                "Spustelkite ant mastelio linijos pradžios, o po to – ant pabaigos."
-            )
+            title_text = _('sam_step1_title', "STEP 1: Set the scale!\nClick on the start of the scale line, then on the end.")
             self.ax2d.set_title(title_text, fontsize=12, pad=10, color='red', fontweight='bold')
             
         self.ax2d.axis('off')
@@ -325,7 +319,7 @@ class SAMAutomaticAnalyzer:
             eq_diameter = 2 * np.sqrt(area_um2 / np.pi)
             if area_um2 < 0.01: continue # Per maži (šiukšlės)
             
-            contours, _ = cv2.findContours(mask_uint8, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            contours, _ignore = cv2.findContours(mask_uint8, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
             if contours:
                 cnt = contours[0]
                 perimeter_pixels = cv2.arcLength(cnt, True)
@@ -406,25 +400,28 @@ class SAMAutomaticAnalyzer:
             aspects = [s['Aspect_Ratio'] for s in stats_list]
             roughness_Ra = [s['Ra_um'] for s in stats_list]
             
-            fracture_type = ("Stipriai Intergranuliarinis" if fracture_index > 0.5
-                             else "Transgranuliarinis" if fracture_index < -0.5
-                             else "Mišrus")
+            fracture_type_key = ("fracture_Stipriai_Intergranuliarinis" if fracture_index > 0.5
+                                 else "fracture_Transgranuliarinis" if fracture_index < -0.5
+                                 else "fracture_Mišrus")
+            fracture_type = _(fracture_type_key, "Mixed")
+            
+            units_vnt = _("sam_units_vnt", "pcs.")
             
             self._global_stats = {
-                "Algoritmas":          "SAM 2.1 (Segment Anything)",
-                "Grūdelių skaičius":   f"{len(stats_list)} vnt.",
-                "Vid. diametras":      f"{np.mean(diams):.2f} µm",
-                "Min diametras":       f"{np.min(diams):.2f} µm",
-                "Max diametras":       f"{np.max(diams):.2f} µm",
-                "Vid. plotas":         f"{np.mean(areas):.2f} µm²",
-                "Min plotas":          f"{np.min(areas):.2f} µm²",
-                "Max plotas":          f"{np.max(areas):.2f} µm²",
-                "Vid. anizotropija":   f"{np.mean(aspects):.3f} [be vnt.]",
-                "Vid. sferiškumas":    f"{np.mean(sphericities):.3f} [be vnt.]",
-                "Ribų tankis":         f"{grain_boundary_density:.4f} µm⁻¹",
-                "Vid. Ra":             f"{np.mean(roughness_Ra):.4f} µm",
-                "Lūžio indeksas":      f"{fracture_index:.4f} µm",
-                "Lūžio tipas":         fracture_type,
+                _("sam_stat_algorithm", "Algorithm"):          "SAM 2.1 (Segment Anything)",
+                _("sam_stat_count", "Grain Count"):   f"{len(stats_list)} {units_vnt}",
+                _("sam_stat_mean_diam", "Mean Diameter"):      f"{np.mean(diams):.2f} µm",
+                _("sam_stat_min_diam", "Min Diameter"):       f"{np.min(diams):.2f} µm",
+                _("sam_stat_max_diam", "Max Diameter"):       f"{np.max(diams):.2f} µm",
+                _("sam_stat_mean_area", "Mean Area"):         f"{np.mean(areas):.2f} µm²",
+                _("sam_stat_min_area", "Min Area"):          f"{np.min(areas):.2f} µm²",
+                _("sam_stat_max_area", "Max Area"):          f"{np.max(areas):.2f} µm²",
+                _("sam_stat_aspect", "Mean Anisotropy"):   f"{np.mean(aspects):.3f}",
+                _("sam_stat_sphericity", "Mean Sphericity"):    f"{np.mean(sphericities):.3f}",
+                _("sam_stat_gb_density", "GB Density"):         f"{grain_boundary_density:.4f} µm⁻¹",
+                _("sam_stat_roughness", "Mean Ra"):             f"{np.mean(roughness_Ra):.4f} µm",
+                _("sam_stat_fracture_idx", "Fracture Index"):      f"{fracture_index:.4f} µm",
+                _("sam_stat_fracture_type", "Fracture Type"):         fracture_type,
             }
             
             for k, v in self._global_stats.items():
@@ -476,7 +473,7 @@ class SAMAutomaticAnalyzer:
         qt_app = Qw.QApplication.instance() or Qw.QApplication(sys.argv)
                
         win = Qw.QMainWindow()
-        win.setWindowTitle("SAM 2.1 3D Reljefas - Interaktyvi Analizė")
+        win.setWindowTitle(_("sam_window_title_3d", "SAM 2.1 3D Relief - Interactive Analysis"))
         win.resize(1380, 1000)
 
         central = Qw.QWidget()
@@ -507,7 +504,7 @@ class SAMAutomaticAnalyzer:
             lab.setStyleSheet("color:#111111; font-weight:bold; margin-top:8px;")
             ctrl_layout.addWidget(lab)
 
-        lbl("<b>Spalvų paletė:</b>")
+        lbl(f"<b>{_('sam_palette', 'Color palette:')}</b>")
         palette_combo = Qw.QComboBox()
         PALETTES = ["Set3", "nipy_spectral", "tab20", "hsv", "rainbow", "turbo",
                     "viridis", "plasma", "inferno", "coolwarm", "Paired"]
@@ -515,42 +512,42 @@ class SAMAutomaticAnalyzer:
         palette_combo.setCurrentIndex(0)
         ctrl_layout.addWidget(palette_combo)
 
-        lbl("<b>Glodinimas (iter.):</b>")
+        lbl(f"<b>{_('sam_smooth', 'Smoothing (iterations):')}</b>")
         smooth_slider = Qw.QSlider(QtCore.Qt.Orientation.Horizontal)
         smooth_slider.setRange(0, 60)
         smooth_slider.setValue(25)
-        smooth_label = Qw.QLabel("25 iter.")
+        smooth_label = Qw.QLabel(_("sam_smooth_iter", "{} iter.").format(25))
         ctrl_layout.addWidget(smooth_slider)
         ctrl_layout.addWidget(smooth_label)
 
-        lbl("<b>Aukščio mastas:</b>")
+        lbl(f"<b>{_('sam_height', 'Height scale:')}</b>")
         height_slider = Qw.QSlider(QtCore.Qt.Orientation.Horizontal)
         height_slider.setRange(1, 50)
         height_slider.setValue(10)
-        height_label = Qw.QLabel("1.0x")
+        height_label = Qw.QLabel(_("sam_height_x", "{:.1f}x").format(1.0))
         ctrl_layout.addWidget(height_slider)
         ctrl_layout.addWidget(height_label)
 
-        lbl("<b>Skaidrumas (kuo mažiau – tuo skaidresnis):</b>")
+        lbl(f"<b>{_('sam_opacity', 'Opacity:')}</b>")
         opacity_slider = Qw.QSlider(QtCore.Qt.Orientation.Horizontal)
         opacity_slider.setRange(0, 90)
         opacity_slider.setValue(50)
-        opacity_label = Qw.QLabel("Skaidrumas: 50%")
+        opacity_label = Qw.QLabel(_("sam_opac_percent", "Opacity: {}%").format(50))
         ctrl_layout.addWidget(opacity_slider)
         ctrl_layout.addWidget(opacity_label)
 
-        apply_btn = Qw.QPushButton("🔄 Atnaujinti grafiką")
+        apply_btn = Qw.QPushButton(_("sam_btn_update", "🔄 Update 3D Model"))
         apply_btn.setStyleSheet("background:#2E7D32;color:white;font-weight:bold;padding:8px;border-radius:4px;")
         ctrl_layout.addWidget(apply_btn)
 
         # Laukimo pranešimas
-        status_lbl = Qw.QLabel("⏳ Perskaičiuojama, prašome palaukti...")
+        status_lbl = Qw.QLabel(_("sam_status_recalculating", "⏳ Recalculating, please wait..."))
         status_lbl.setStyleSheet("color:#B71C1C;font-weight:bold;padding:6px;background:#FFEBEE;border-radius:4px;")
         status_lbl.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
         status_lbl.setVisible(False)
         ctrl_layout.addWidget(status_lbl)
 
-        export_png_btn = Qw.QPushButton("💾 Išsaugoti PNG")
+        export_png_btn = Qw.QPushButton(_("sam_btn_save_png_short", "📷 Save PNG"))
         export_png_btn.setStyleSheet("background:#1565C0;color:white;font-weight:bold;padding:8px;border-radius:4px;")
         ctrl_layout.addWidget(export_png_btn)
 
@@ -558,11 +555,11 @@ class SAMAutomaticAnalyzer:
         sep = Qw.QLabel("─────────────────────")
         sep.setStyleSheet("color:#999; margin-top:12px;")
         ctrl_layout.addWidget(sep)
-        lbl("<b>Suskaičiuoti parametrai:</b>")
+        lbl(f"<b>{_('sam_stats_calculated', 'Calculated Parameters:')}</b>")
 
         stats_table = Qw.QTableWidget()
         stats_table.setColumnCount(2)
-        stats_table.setHorizontalHeaderLabels(["Parametras", "Reikšmė"])
+        stats_table.setHorizontalHeaderLabels([_("sam_lbl_param", "Parameter"), _("sam_lbl_val", "Value")])
         stats_table.horizontalHeader().setStretchLastSection(True)
         stats_table.setEditTriggers(Qw.QAbstractItemView.EditTrigger.NoEditTriggers)
         stats_table.setStyleSheet("color:#111; background:white; font-size:11px;")
@@ -578,7 +575,7 @@ class SAMAutomaticAnalyzer:
                 stats_table.setItem(r, 1, Qw.QTableWidgetItem(str(v)))
         ctrl_layout.addWidget(stats_table)
 
-        export_xlsx_btn = Qw.QPushButton("📊 Eksportuoti parametrus XLSX")
+        export_xlsx_btn = Qw.QPushButton(_("sam_btn_export_xlsx", "📊 Export grain data to Excel"))
         export_xlsx_btn.setStyleSheet("background:#6A1B9A;color:white;font-weight:bold;padding:8px;border-radius:4px;")
         ctrl_layout.addWidget(export_xlsx_btn)
 
@@ -630,10 +627,10 @@ class SAMAutomaticAnalyzer:
             _set_busy(False)
 
         def apply_changes():
-            smooth_label.setText(f"{smooth_slider.value()} iter.")
-            height_label.setText(f"{height_slider.value()/10:.1f}x")
+            smooth_label.setText(_("sam_smooth_iter", "{} iter.").format(smooth_slider.value()))
+            height_label.setText(_("sam_height_x", "{:.1f}x").format(height_slider.value()/10))
             actual_opacity = 100 - opacity_slider.value()
-            opacity_label.setText(f"Skaidrumas: {actual_opacity}%")
+            opacity_label.setText(_("sam_opac_percent", "Opacity: {}%").format(actual_opacity))
             _build_mesh(smooth_slider.value(), height_slider.value(),
                         palette_combo.currentText(), actual_opacity)
 
@@ -695,7 +692,7 @@ class SAMAutomaticAnalyzer:
                 # ── Excel rašymas ───────────────────────────────────────
                 wb = openpyxl.Workbook()
                 ws = wb.active
-                ws.title = "Analizė"
+                ws.title = _("sam_excel_sheet", "Analysis")
 
                 # Stiliai
                 hdr_font   = Font(bold=True, color="FFFFFF", size=10)
@@ -744,8 +741,11 @@ class SAMAutomaticAnalyzer:
                 SCOL  = len(raw_cols) + GAP + 1   # pradžios stulpelis
                 GCOL  = SCOL + 5 + GAP            # Globalių parametrų stulpelis (po 5 stat stulpelių + gap)
 
-                stat_headers = ["Parametras", "Vidurkis", "Minimum",
-                                "Maximum", "Std. nuokrypis"]
+                stat_headers = [_("sam_excel_param", "Parameter"), 
+                                _("sam_excel_stat_mean", "Mean"), 
+                                _("sam_excel_stat_min", "Minimum"),
+                                _("sam_excel_stat_max", "Maximum"), 
+                                _("sam_excel_stat_std", "Std. Dev.")]
 
                 # Viename lape: kairėje raw, per vidurį statistika, dešinėje globalūs
                 SROW = 1
@@ -766,8 +766,8 @@ class SAMAutomaticAnalyzer:
 
                 # Globalūs parametrai — "Grūdelių skaičius" ir kt. (GRETŽIA STATISTIKAI)
                 # Antraštė
-                _cell(SROW, GCOL,     "Parametras", font=hdr_font, fill=hdr_fill_p, align=center)
-                _cell(SROW, GCOL + 1, "Reikšmė",   font=hdr_font, fill=hdr_fill_p, align=center)
+                _cell(SROW, GCOL,     _("sam_excel_param", "Parameter"), font=hdr_font, fill=hdr_fill_p, align=center)
+                _cell(SROW, GCOL + 1, _("sam_excel_value", "Value"),   font=hdr_font, fill=hdr_fill_p, align=center)
                 ws.column_dimensions[get_column_letter(GCOL)].width = 25
                 ws.column_dimensions[get_column_letter(GCOL + 1)].width = 20
 
@@ -787,13 +787,13 @@ class SAMAutomaticAnalyzer:
         apply_btn.clicked.connect(apply_changes)
         export_png_btn.clicked.connect(export_png)
         export_xlsx_btn.clicked.connect(export_xlsx)
-        smooth_slider.valueChanged.connect(lambda v: smooth_label.setText(f"{v} iter."))
-        height_slider.valueChanged.connect(lambda v: height_label.setText(f"{v/10:.1f}x"))
-        opacity_slider.valueChanged.connect(lambda v: opacity_label.setText(f"Skaidrumas: {100 - v}%"))
+        smooth_slider.valueChanged.connect(lambda v: smooth_label.setText(_("sam_smooth_iter", "{} iter.").format(v)))
+        height_slider.valueChanged.connect(lambda v: height_label.setText(_("sam_height_x", "{:.1f}x").format(v/10)))
+        opacity_slider.valueChanged.connect(lambda v: opacity_label.setText(_("sam_opac_percent", "Opacity: {}%").format(100 - v)))
 
         _build_mesh(25, 10, "Set3", 50)
         win.show()
-        print("Atidaromas 3D langas! Jį galite sukioti su pele, priartinti su ratuku.", flush=True)
+        print(_("sam_open_3d_msg", "Opening 3D Window! You can rotate with mouse, zoom with scroll wheel."), flush=True)
         qt_app.exec()
 
     def run(self):
@@ -839,7 +839,7 @@ class InteractiveSAMCorrector:
         self.selected_indices = []
         
         self.fig, self.ax = plt.subplots(figsize=(14, 12))
-        self.fig.canvas.manager.set_window_title("SAM 2.1 Rankinis Koregavimas")
+        self.fig.canvas.manager.set_window_title(_("sam_window_title_manual", "SAM 2.1 Manual Adjustment"))
         
         self.cid_click = self.fig.canvas.mpl_connect('button_press_event', self.on_click)
         self.cid_key = self.fig.canvas.mpl_connect('key_press_event', self.on_key)
@@ -851,15 +851,15 @@ class InteractiveSAMCorrector:
         
         # Sukuriame papildomas ašis mygtukams (pos: [left, bottom, width, height])
         ax_repeat = self.fig.add_axes([0.02, 0.01, 0.15, 0.04])
-        self.btn_repeat = Button(ax_repeat, '🔄 Pakartoti aptikimą', color='#E3F2FD', hovercolor='#BBDEFB')
+        self.btn_repeat = Button(ax_repeat, _("sam_btn_repeat", "🔄 Repeat detection"), color='#E3F2FD', hovercolor='#BBDEFB')
         self.btn_repeat.on_clicked(self.on_repeat_clicked)
         
         ax_roi = self.fig.add_axes([0.18, 0.01, 0.15, 0.04])
-        self.btn_roi = Button(ax_roi, '✂️ Iš naujo sritį', color='#FFF9C4', hovercolor='#FFF176')
+        self.btn_roi = Button(ax_roi, _("sam_btn_roi", "✂️ New region (ROI)"), color='#FFF9C4', hovercolor='#FFF176')
         self.btn_roi.on_clicked(self.on_roi_clicked)
         
         ax_export = self.fig.add_axes([0.34, 0.01, 0.15, 0.04])
-        self.btn_export = Button(ax_export, '📷 PNG eksportas', color='#E8F5E9', hovercolor='#C8E6C9')
+        self.btn_export = Button(ax_export, _("sam_btn_save_png_short", "📷 Save PNG"), color='#E8F5E9', hovercolor='#C8E6C9')
         self.btn_export.on_clicked(self.on_export_clicked)
         
         self.render()
@@ -891,12 +891,12 @@ class InteractiveSAMCorrector:
             
             # Pažymime mygtuką žaliai kaip sėkmės ženklą
             self.btn_export.ax.set_facecolor('#4CAF50') 
-            self.btn_export.label.set_text("✅ IŠSAUGOTA")
+            self.btn_export.label.set_text(_("sam_btn_saved_status", "✅ SAVED"))
             self.fig.canvas.draw()
             
             # Po sekundės grąžiname pradinį tekstą (spalvą paliekame žalią iki kito veiksmo)
             plt.pause(1.5)
-            self.btn_export.label.set_text("📷 PNG eksportas")
+            self.btn_export.label.set_text(_("sam_btn_save_png_short", "📷 Save PNG"))
             self.fig.canvas.draw()
             
         except Exception as e:
@@ -946,11 +946,11 @@ class InteractiveSAMCorrector:
             else:
                 self.base_img_obj.set_data(display_img)
             
-            self.ax.set_title(f"Apdorotoje srityje rasta grūdelių: {len(self.masks)}", 
+            self.ax.set_title(_("sam_manual_title_format", "Grains found in the processed region: {len_masks}").format(len_masks=len(self.masks)), 
                               fontsize=13, fontweight='bold', color='#1A237E', pad=15)
             
             # Visa informacija apačioje
-            full_info = "RANKINIS APDOROJIMAS  |  [J] Sujungti  |  [D] Ištrinti  |  [S] Perskirti  |  [ESC] Baigti"
+            full_info = _("sam_manual_info_bar", "MANUAL PROCESSING  |  [J] Merge  |  [D] Delete  |  [S] Split  |  [ESC] Exit")
             
             self.info_text_obj = self.ax.text(0.5, -0.02, full_info, transform=self.ax.transAxes, 
                          ha='center', va='top', fontsize=11, fontweight='bold', 
@@ -997,7 +997,7 @@ class InteractiveSAMCorrector:
 
     def merge_selected(self):
         if len(self.selected_indices) < 2: 
-            print("Pasirinkite bent 2 grūdelius sujungimui!", flush=True)
+            print(_("sam_merge_warning", "Select at least 2 grains for merging!"), flush=True)
             return
         print(f"Sujungiami grūdeliai: {[i+1 for i in self.selected_indices]}", flush=True)
         new_mask_bool = np.zeros_like(self.masks[0]['segmentation'], dtype=bool)
@@ -1027,7 +1027,7 @@ class InteractiveSAMCorrector:
     def split_selected(self):
         idx = self.selected_indices[0]
         mask_bool = self.masks[idx]['segmentation']
-        print(f"Perskiriamas grūdelis {idx+1}. Pažymėkite du taškus centre naujų dalių.", flush=True)
+        print(_("sam_split_prompt", "Splitting grain {idx}. Mark two points in the center of the new parts.").format(idx=idx+1), flush=True)
         pts = plt.ginput(2, timeout=0)
         if len(pts) < 2: return
         
@@ -1037,7 +1037,7 @@ class InteractiveSAMCorrector:
         
         new_masks = []
         for pt in pts:
-            m, scores, _ = predictor.predict(
+            m, scores, _ignore = predictor.predict(
                 point_coords=np.array([pt]),
                 point_labels=np.array([1]),
                 multimask_output=True
@@ -1079,9 +1079,16 @@ if __name__ == "__main__":
         root = tk.Tk()
         root.withdraw()
         root.attributes('-topmost', True)
+        
+        init_dir = get_config_val('default_sem_folder', '')
+        import os
+        if not init_dir or not os.path.exists(init_dir):
+            init_dir = None
+            
         IMAGE_PATH = filedialog.askopenfilename(
-            title="Pasirinkite SEM nuotrauką analizei",
-            filetypes=[("Nuotraukos", "*.tif *.tiff *.png *.jpg *.jpeg")]
+            title=_("sam_select_image_title", "Select SEM image for analysis"),
+            filetypes=[(_("sam_image_filetype_desc", "Images"), "*.tif *.tiff *.png *.jpg *.jpeg")],
+            initialdir=init_dir
         )
         root.destroy()
         

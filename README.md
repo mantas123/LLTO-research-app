@@ -13,9 +13,12 @@
 
 ---
 
+> [!NOTE]
+> **English speakers:** For the English version of the documentation, please see **[README_ENG.md](README_ENG.md)**.
+
 **CeraMIS** – tai programinė įranga, skirta Ličio Lantano Titanato (**LLTO**) kietųjų elektrolitų kompleksinei impedanso spektroskopijos (EIS), relaksacijos trukmės pasiskirstymo (DRT), struktūrinės 3D perovskitų simuliacijos ir SEM mikrostruktūros dirbtinio intelekto analizei.
 
-Programa apjungia mašininio mokymosi algoritmus (Meta SAM 3.1) su klasikiniais elektrocheminiais ir kristalografiniais modeliais.
+Programa apjungia mašininio mokymosi algoritmus (Meta SAM 2.1 / 3.1) su klasikiniais elektrocheminiais ir kristalografiniais modeliais. Visa sistema (įskaitant išorinius modulius ir 3D vizualizatorius) yra pilnai pritaikyta lietuvių ir anglų kalboms.
 
 ---
 
@@ -43,16 +46,16 @@ graph TD
 > Detalų EIS modulių aprašymą rasite dokumente: **[README_EIS_PLOTS.md](README_EIS_PLOTS.md)**.
 
 ### 2. 🌀 Lanko Pločio Analizė
-*   Interaktyvus impedanso puslankių ploties ir jų charakteringųjų dažnių identifikavimas Cole-Cole erdvėje.
+*   Interaktyvus impedanso puslankių pločio ir jų charakteringųjų dažnių identifikavimas Cole-Cole erdvėje.
 *   Vizualus skirtingų laidumo mechanizmų (tūrinio, grūdelių ribų ir poliarizacijos) atskyrimas.
 
 > [!TIP]
 > Detalų lanko analizės modulio aprašymą rasite dokumente: **[README_ARC_WIDTH.md](README_ARC_WIDTH.md)**.
 
 ### 3. 🌡️ Arenijaus Analizė (Arenijaus dėsnis)
-*   **Aktyvacijos Energijos ($E_ {a}$) Skaičiavimas**: Automatinis tiesinis parametrų derinimas naudojant $\sigma T = \sigma_ {0} \exp\left(-\frac{E_ {a}}{k_ {B} T}\right)$ sąryšį.
+*   **Aktyvacijos Energijos ($E_{a}$) Skaičiavimas**: Automatinis tiesinis parametrų derinimas naudojant $\sigma T = \sigma_{0} \exp\left(-\frac{E_{a}}{k_{B} T}\right)$ sąryšį.
 *   **Komponentų Išskyrimas**: Atskiras tūrinio laidumo (Bulk), grūdelių ribų (Grain Boundary) bei pilno laidumo (Total) aktyvacijos energijų (eV) skaičiavimas.
-*   **Išmanus Redagavimas**: Interaktyvus taškų įtraukimas / pašalinimas iš regresijos, momentinis $R^2$ ir $E_ {a}$ perskaičiavimas bei kelių regresijų overlay grafike.
+*   **Išmanus Redagavimas**: Interaktyvus taškų įtraukimas / pašalinimas iš regresijos, momentinis $R^2$ ir $E_{a}$ perskaičiavimas bei kelių regresijų overlay grafike.
 
 > [!TIP]
 > Detalų Arenijaus modulio aprašymą rasite dokumente: **[README_ARRHENIUS.md](README_ARRHENIUS.md)**.
@@ -66,7 +69,7 @@ graph TD
 > Detalų DRT modulio aprašymą rasite dokumente: **[README_DRT.md](README_DRT.md)**.
 
 ### 5. 🤖 SEM Analizė (AI / SAM 2.1 & 3.1)
-*   **Segment Anything Model (SAM)**: Automatinis kietojo elektrolito grūdelių (grains) aptikimas ir kontūrų segmentavimas SEM mikrografijose.
+*   **Segment Anything Model (SAM)**: Automatinis kietojo elektrolito grūdelių (grains) aptikimas ir kontūrų segmentavimas SEM mikrografijose su Meta SAM 2.1 arba SAM 3.1.
 *   **3D Reljefo Rekonstrukcija**: Pilna 3D paviršiaus topografijos vizualizacija naudojant PyVista (VTK pagrindu). Gylis ($z$) rekonstruojamas pagal pilkumo skalės intensyvumą.
 *   **Skilimo Analizė**: Kiekybinis lūžio topologijos įvertinimas (Intergranuliarinis vs Transgranuliarinis skilimas) skaičiuojant gylio skirtumus grūdelių viduje ir jų sandūrose.
 *   **Šiurkštumo Parametrai**: Kiekvieno grūdelio bei globalaus paviršiaus Ra ir Rq šiurkštumo charakteristikų skaičiavimas.
@@ -89,6 +92,16 @@ graph TD
 
 > [!TIP]
 > Detalų kristalo simuliatoriaus modulio aprašymą rasite dokumente: **[README_CRYSTAL.md](README_CRYSTAL.md)**.
+
+### 8. ⚙️ Nustatymai (Settings)
+*   **Kalbos Pasirinkimas (Language Selection)**: Vartotojo sąsajos kalbos pasirinkimas (`en` / `lt`). Pakeitus kalbą, visi pagrindiniai moduliai bei išoriniai procesai (SAM segmentavimo korektoriai, 3D PyVista rodytuvai) bus automatiškai išversti.
+*   **Programos Mastelis (GUI Scale)**: Lanksus mastelio koeficientas (`0.75x` iki `2.0x`), leidžiantis pritaikyti programos dydį ir tekstų šriftus prie skirtingos monitorių raiškos (pvz., 4K ekranų) bei sisteminių Windows mastelio nustatymų.
+*   **SEM AI Modelio Pasirinkimas**: Galimybė nustatymų lange lengvai pasirinkti tarp **SAM 2.1** bei **SAM 3.1** dirbtinio intelekto modelio versijų.
+*   **Numatytieji Keliai (Default Paths & Files)**: Automatinis nurodytų failų / katalogų užkrovimas ir failų pasirinkimo langų (file dialogs) pradžios katalogo nustatymas:
+    *   **EIS spektro failas** (`default_spectrum_file`).
+    *   **dearEIS JSON projektas** (`default_deareis_project`).
+    *   **SEM nuotraukų aplankas** (`default_sem_folder`).
+    *   **SEM statistikos aplankas** (`default_sem_stats_folder`).
 
 ---
 
@@ -130,17 +143,11 @@ python "main CeraMIS.py"
 ```
 
 > [!NOTE]
-> Paleidus programą, ji automatiškai patikrins, ar nurodytuose keliuose yra numatytieji LLTO duomenų failai (`.xlsx` impedanso duomenys ir `.json` dearEIS projektas). Jei failai nerandami, juos galima lengvai įkelti rankiniu būdu per grafinę sąsają naudojant mygtukus **„📂 Pasirinkti failą...“** arba **„📂 Įkelti dearEIS projektą...“**.
-
----
-
-## 📊 Rezultatų Eksportas
-
-*   **Excel (.xlsx) ataskaitos**: Visi skaičiavimai (individualūs grūdelių duomenys, globali statistika ir fizikiniai moduliai) yra eksportuojami į Excel failus.
-*   **Grafikos eksportas (PNG/PDF)**: Grafikus galima išsaugoti PNG arba PDF formatu.
+> Paleidus programą, ji automatiškai patikrins, ar nurodytuose keliuose yra numatytieji LLTO duomenų failai (`.xlsx` impedanso duomenys ir `.json` dearEIS projektas). Jei failai nerandami, juos galima lengvai įkelti rankiniu būdu per grafinę sąsają naudojant mygtukus **„📂 Pasirinkti failą...“** arba **„📂 Įkelti [dearEIS](https://github.com/vyrjana/DearEIS) projektą...“**.
 
 ---
 
 ## ⚖️ Licencija ir Autorinės Teises
 
 *   **Programinės įrangos autorius**: Mantas Jonas Marcinkevičius
+*   **Licencija**: Licensed under the Apache License, Version 2.0 (see [LICENSE](LICENSE)).

@@ -5,6 +5,7 @@ from pyvistaqt import QtInteractor
 from PyQt6 import QtWidgets, QtCore, QtGui
 import random
 import os
+from language_driver import _
 
 # LLTO composition (approximate)
 # La: ~55%, Li: ~35%, Vacancy: ~10%
@@ -279,60 +280,60 @@ class CrystalViewerWidget(QtWidgets.QWidget):
         panel.setStyleSheet("background-color: #16213e; color: white; font-family: Arial;")
         panel_layout = QtWidgets.QVBoxLayout(panel)
         
-        title = QtWidgets.QLabel("🔷 LLTO Kristalų Struktūros\nVizualizacija")
+        title = QtWidgets.QLabel(_("crystal_view_title", "🔷 LLTO Crystal Structure\n3D Visualization"))
         title.setStyleSheet("font-size: 15px; font-weight: bold; margin-bottom: 10px; color: #e94560;")
         panel_layout.addWidget(title)
         
         # Fazė
         # Lietuviski pavadinimai -> angliski raktai
         self.PHASE_MAP = {
-            "Kubinė": "Cubic",
-            "Tetragoninė": "Tetragonal",
-            "Ortorombinė": "Orthorhombic",
-            "Monoklinė": "Monoclinic",
-            "Dvynių domenai": "Twinned Domains",
-            "Amorfinė": "Amorphous",
-            "Ruddlesden-Popper": "Ruddlesden-Popper",
+            _("crystal_phase_cubic", "Kubinė"): "Cubic",
+            _("crystal_phase_tetragonal", "Tetragoninė"): "Tetragonal",
+            _("crystal_phase_orthorhombic", "Ortorombinė"): "Orthorhombic",
+            _("crystal_phase_monoclinic", "Monoklinė"): "Monoclinic",
+            _("crystal_phase_twinned", "Dvynių domenai"): "Twinned Domains",
+            _("crystal_phase_amorphous", "Amorfinė"): "Amorphous",
+            _("crystal_phase_rp", "Ruddlesden-Popper"): "Ruddlesden-Popper",
         }
-        panel_layout.addWidget(QtWidgets.QLabel("Kristalografinė fazė:"))
+        panel_layout.addWidget(QtWidgets.QLabel(_("crystal_phase_label", "Crystallographic phase:")))
         self.phase_combo = QtWidgets.QComboBox()
         self.phase_combo.addItems(list(self.PHASE_MAP.keys()))
         self.phase_combo.setStyleSheet("background-color: #1a1a2e; color: white; padding: 5px; border: 1px solid #e94560;")
         self.phase_combo.currentIndexChanged.connect(self.apply_phase)
         panel_layout.addWidget(self.phase_combo)
-
+ 
         # Gardelės dydis
-        panel_layout.addWidget(QtWidgets.QLabel("Gardelės dydis:"))
+        panel_layout.addWidget(QtWidgets.QLabel(_("crystal_cell_label", "Supercell size:")))
         self.cell_combo = QtWidgets.QComboBox()
         self.cell_combo.addItems(["1×1×1", "2×2×2", "3×3×3", "6×2×2", "6×3×3"])
         self.cell_combo.setCurrentIndex(1)
         self.cell_combo.setStyleSheet("background-color: #1a1a2e; color: white; padding: 5px; border: 1px solid #e94560;")
         self.cell_combo.currentIndexChanged.connect(self.apply_phase)
         panel_layout.addWidget(self.cell_combo)
-
+ 
         # Domenų riba
-        self.domain_check = QtWidgets.QCheckBox("Rodyti domenų ribą")
+        self.domain_check = QtWidgets.QCheckBox(_("crystal_show_boundary", "Show domain boundary"))
         self.domain_check.setChecked(True)
         self.domain_check.setStyleSheet("color: #f39c12; font-weight: bold;")
         self.domain_check.stateChanged.connect(self.apply_phase)
         panel_layout.addWidget(self.domain_check)
-
+ 
         # Deguonies langai
-        self.window_check = QtWidgets.QCheckBox("Rodyti deguonies langus")
+        self.window_check = QtWidgets.QCheckBox(_("crystal_show_windows", "Show oxygen windows"))
         self.window_check.setChecked(False)
         self.window_check.setStyleSheet("color: #00f2ff; font-weight: bold;")
         self.window_check.stateChanged.connect(self._toggle_oxygen_windows)
         panel_layout.addWidget(self.window_check)
-
+ 
         # Joniniai spinduliai (Realus modelis)
-        self.realistic_check = QtWidgets.QCheckBox("Rodyti joninius spindulius")
+        self.realistic_check = QtWidgets.QCheckBox(_("crystal_show_radii", "Show ionic radii"))
         self.realistic_check.setChecked(False)
         self.realistic_check.setStyleSheet("color: white; font-weight: bold; margin-bottom: 5px;")
         self.realistic_check.stateChanged.connect(self._rebuild_scene)
         panel_layout.addWidget(self.realistic_check)
         
         # Stechiometrija
-        stoich_group = QtWidgets.QGroupBox("Stechiometrija")
+        stoich_group = QtWidgets.QGroupBox(_("crystal_stoichiometry", "Stoichiometry"))
         stoich_group.setStyleSheet("color: white; border: 1px solid #444; margin-top: 5px;")
         stoich_layout = QtWidgets.QVBoxLayout()
         def create_custom_spin(label_text, initial_value, callback):
@@ -363,19 +364,19 @@ class CrystalViewerWidget(QtWidgets.QWidget):
             layout.addWidget(spin)
             layout.addWidget(btn_plus)
             return spin, layout
-
+ 
         self.spin_la, la_layout = create_custom_spin("La (%):", 55.7, self.update_stoichiometry)
         stoich_layout.addLayout(la_layout)
         
         self.spin_li, li_layout = create_custom_spin("Li (%):", 33.0, self.update_stoichiometry)
         stoich_layout.addLayout(li_layout)
         
-        self.lbl_vac = QtWidgets.QLabel("Vakansija (%): 11.3")
+        self.lbl_vac = QtWidgets.QLabel(f"{_('crystal_atom_Vac', 'Vacancy')} (%): 11.3")
         stoich_layout.addWidget(self.lbl_vac)
         stoich_group.setLayout(stoich_layout)
         panel_layout.addWidget(stoich_group)
         
-        self.apply_btn = QtWidgets.QPushButton("Taikyti fazę ir stechiometriją")
+        self.apply_btn = QtWidgets.QPushButton(_("crystal_apply_btn", "Apply Phase & Stoichiometry"))
         self.apply_btn.setStyleSheet("background-color: #e94560; color: white; padding: 5px; font-weight: bold;")
         self.apply_btn.clicked.connect(self.apply_phase)
         panel_layout.addWidget(self.apply_btn)
@@ -383,18 +384,18 @@ class CrystalViewerWidget(QtWidgets.QWidget):
         panel_layout.addSpacing(10)
         
         # Temperatūra
-        self.temp_label = QtWidgets.QLabel("Temperatūra: 300 K")
+        self.temp_label = QtWidgets.QLabel(_("crystal_temp_label", "Temperature: {} K").format(300))
         panel_layout.addWidget(self.temp_label)
         self.temp_slider = QtWidgets.QSlider(QtCore.Qt.Orientation.Horizontal)
         self.temp_slider.setRange(145, 1060)
         self.temp_slider.setValue(300)
         self.temp_slider.valueChanged.connect(self.on_temp_changed)
         panel_layout.addWidget(self.temp_slider)
-
+ 
         panel_layout.addSpacing(10)
         
         # Oktaedro pasvirimas
-        self.tilt_label = QtWidgets.QLabel("Oktaedro pasvirimas: 0°")
+        self.tilt_label = QtWidgets.QLabel(_("crystal_tilt_label", "Octahedron tilt: {}°").format(0))
         panel_layout.addWidget(self.tilt_label)
         self.tilt_slider = QtWidgets.QSlider(QtCore.Qt.Orientation.Horizontal)
         self.tilt_slider.setRange(-15, 15)
@@ -405,35 +406,35 @@ class CrystalViewerWidget(QtWidgets.QWidget):
         panel_layout.addSpacing(20)
         
         # Jono šuolis
-        self.jump_btn = QtWidgets.QPushButton("▶ Įjungti nuolatinį Li šuolį")
+        self.jump_btn = QtWidgets.QPushButton(_("crystal_jump_start", "▶ Start Li Hop Animation"))
         self.jump_btn.setStyleSheet("background-color: #2ecc40; color: white; padding: 8px; font-weight: bold;")
         self.jump_btn.clicked.connect(self.toggle_jump_animation)
         panel_layout.addWidget(self.jump_btn)
-
+ 
         panel_layout.addSpacing(10)
         
         # Elektrinis laukas
-        field_group = QtWidgets.QGroupBox("⚡ Elektrinis laukas")
+        field_group = QtWidgets.QGroupBox(_("crystal_field_group", "⚡ Electric Field"))
         field_group.setStyleSheet("color: #f1c40f; border: 1px solid #f1c40f; margin-top: 5px;")
         field_layout = QtWidgets.QVBoxLayout()
         
-        self.field_check = QtWidgets.QCheckBox("Įjungti elektrinio lauko poveikį")
+        self.field_check = QtWidgets.QCheckBox(_("crystal_field_check", "Enable electric field effect"))
         self.field_check.setStyleSheet("color: white;")
         field_layout.addWidget(self.field_check)
         
         field_group.setLayout(field_layout)
         panel_layout.addWidget(field_group)
-
-
+ 
+ 
         # Fono spalva
-        self.bg_check = QtWidgets.QCheckBox("Baltas fonas")
+        self.bg_check = QtWidgets.QCheckBox(_("crystal_white_bg", "White Background"))
         self.bg_check.setChecked(True)
         self.bg_check.setStyleSheet("color: white; font-weight: bold;")
         self.bg_check.stateChanged.connect(self.toggle_background)
         panel_layout.addWidget(self.bg_check)
-
+ 
         # Eksportuoti ekrano nuotrauką
-        self.export_btn = QtWidgets.QPushButton("📷 Eksportuoti PNG")
+        self.export_btn = QtWidgets.QPushButton(_("crystal_export_png", "📷 Export PNG"))
         self.export_btn.setStyleSheet("background-color: #2980b9; color: white; padding: 8px; font-weight: bold;")
         self.export_btn.clicked.connect(self.export_screenshot)
         panel_layout.addWidget(self.export_btn)
@@ -464,7 +465,7 @@ class CrystalViewerWidget(QtWidgets.QWidget):
             circle.setFixedSize(16, 16)
             circle.setStyleSheet(f"background-color: {style['color']}; border-radius: 8px; border: none;")
             
-            label = QtWidgets.QLabel(style['name'])
+            label = QtWidgets.QLabel(_(f"crystal_atom_{atype}", style['name']))
             label.setStyleSheet("color: black; font-weight: bold; font-family: Arial; font-size: 13px; border: none;")
             
             row.addWidget(circle)
@@ -480,15 +481,17 @@ class CrystalViewerWidget(QtWidgets.QWidget):
         
         # "Vieno pikselio" atnaujinimas, kad legenda atsirastų tinkamoje vietoje po užkrovimo
         QtCore.QTimer.singleShot(100, lambda: self.resizeEvent(None))
-
+ 
     def resizeEvent(self, event):
         super().resizeEvent(event)
-        # Visada laikome legendą viršutiniame dešiniame kampe
+        # Visada laikome legendą dešiniajame viduryje
         if hasattr(self, 'legend_overlay'):
             pw = self.plotter.interactor.width()
+            ph = self.plotter.interactor.height()
             lw = self.legend_overlay.width()
-            self.legend_overlay.move(pw - lw - 20, 20)
-
+            lh = self.legend_overlay.height()
+            self.legend_overlay.move(pw - lw - 20, (ph - lh) // 2)
+ 
     def toggle_background(self, state):
         if self.bg_check.isChecked():
             self.plotter.set_background('white')
@@ -498,13 +501,13 @@ class CrystalViewerWidget(QtWidgets.QWidget):
 
     def export_screenshot(self):
         import datetime
-        path, _ = QtWidgets.QFileDialog.getSaveFileName(
-            self, "Saugoti PNG",
+        path, _filter = QtWidgets.QFileDialog.getSaveFileName(
+            self, _("crystal_save_png_title", "Save PNG"),
             f"LLTO_crystal_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.png",
-            "PNG paveikslėlis (*.png)"
+            _("crystal_png_filetype", "PNG Image (*.png)")
         )
         if path:
-            self.plotter.screenshot(path)
+            self.plotter.screenshot(path, transparent_background=True)
 
     def update_stoichiometry(self):
         la = self.spin_la.value()
@@ -515,11 +518,11 @@ class CrystalViewerWidget(QtWidgets.QWidget):
             self.spin_li.setValue(li)
             self.spin_li.blockSignals(False)
         vac = 100 - la - li
-        self.lbl_vac.setText(f"Vakansija (%): {vac}")
+        self.lbl_vac.setText(f"{_('crystal_atom_Vac', 'Vacancy')} (%): {vac}")
 
     def on_temp_changed(self, value):
         self.temperature = value
-        self.temp_label.setText(f"Temperatūra: {value} K")
+        self.temp_label.setText(_("crystal_temp_label", "Temperature: {} K").format(value))
         if self.continuous_jumping:
             speed = max(5, int(30 * (300 / self.temperature)))
             self.li_jump_timer.setInterval(speed)
@@ -548,13 +551,11 @@ class CrystalViewerWidget(QtWidgets.QWidget):
         
         la_frac = self.spin_la.value() / 100.0
         li_frac = self.spin_li.value() / 100.0
-        phase_lt = self.phase_combo.currentText()
-        phase_en = self.PHASE_MAP.get(phase_lt, 'Cubic')
         
         # Sustabdome animaciją, jei ji veikia, kad išvengtume klaidų perkuriant gardelę
         self.li_jump_timer.stop()
         self.continuous_jumping = False
-        self.jump_btn.setText("▶ Įjungti nuolatinį Li šuolį")
+        self.jump_btn.setText(_("crystal_jump_start", "▶ Start Li Hop Animation"))
         self.jump_btn.setStyleSheet("background-color: #2ecc40; color: white; padding: 8px; font-weight: bold;")
         
         if self.jump_actor:
@@ -573,7 +574,7 @@ class CrystalViewerWidget(QtWidgets.QWidget):
         self.tilt_slider.setValue(0)
         self.tilt_slider.blockSignals(False)
         
-        self.tilt_label.setText("Oktaedro pasvirimas: 0°")
+        self.tilt_label.setText(_("crystal_tilt_label", "Octahedron tilt: {}°").format(0))
         self._rebuild_scene()
 
     def _rebuild_scene(self):
@@ -638,7 +639,7 @@ class CrystalViewerWidget(QtWidgets.QWidget):
             i_size=ny + 0.5,
             j_size=nz + 0.5
         )
-        self.domain_boundary_actor = self.plotter.add_mesh(plane, color='#f39c12', opacity=0.4, label="Domenų riba", style='surface', show_edges=True, edge_color='#e67e22')
+        self.domain_boundary_actor = self.plotter.add_mesh(plane, color='#f39c12', opacity=0.4, label=_("crystal_domain_boundary_label", "Domain boundary"), style='surface', show_edges=True, edge_color='#e67e22')
         visible = self.domain_check.isChecked()
         self.domain_boundary_actor.SetVisibility(visible)
 
@@ -707,7 +708,7 @@ class CrystalViewerWidget(QtWidgets.QWidget):
     def on_tilt_changed(self, value):
         # Ti-O-Ti kampas yra maždaug 180 - 2 * tilt
         ti_o_ti = 180 - 2 * abs(value)
-        self.tilt_label.setText(f"Oktaedro pasvirimas: {value}° (Ti-O-Ti: {ti_o_ti}°)")
+        self.tilt_label.setText(_("crystal_tilt_format", "Octahedron tilt: {}° (Ti-O-Ti: {}°)").format(value, ti_o_ti))
         self._apply_tilt(value)
 
     def _apply_tilt(self, angle_deg):
@@ -798,18 +799,18 @@ class CrystalViewerWidget(QtWidgets.QWidget):
         li = self.spin_li.value()
         vac = 100.0 - la - li
         if vac < 0: vac = 0
-        self.lbl_vac.setText(f"Vakansija (%): {vac:.1f}")
+        self.lbl_vac.setText(f"{_('crystal_atom_Vac', 'Vacancy')} (%): {vac:.1f}")
 
     def toggle_jump_animation(self):
         if self.continuous_jumping:
             self.continuous_jumping = False
-            self.jump_btn.setText("▶ Tęsti / Pradėti Li šuolį")
+            self.jump_btn.setText(_("crystal_jump_start", "▶ Start Li Hop Animation"))
             self.jump_btn.setStyleSheet("background-color: #2ecc40; color: white; padding: 8px; font-weight: bold;")
             # Sustabdome laikmatį, bet NIEKO nenaikiname - jonas lieka ten, kur yra
             self.li_jump_timer.stop()
         else:
             self.continuous_jumping = True
-            self.jump_btn.setText("⏸ Sustabdyti šuolio animaciją")
+            self.jump_btn.setText(_("crystal_jump_stop", "⏸ Stop Jump Animation"))
             self.jump_btn.setStyleSheet("background-color: #e74c3c; color: white; padding: 8px; font-weight: bold;")
             # Jei jau buvo pradėtas šuolis (yra jump_actor), tiesiog pratęsiame laikmatį
             if self.jump_source_idx != -1:
@@ -882,10 +883,10 @@ class CrystalViewerWidget(QtWidgets.QWidget):
         
         if self.jump_source_idx == -1:
             self.continuous_jumping = False
-            self.jump_btn.setText("▶ Įjungti šuolį (Laukas įjungtas)" if field_active else "▶ Įjungti nuolatinį Li šuolį")
+            self.jump_btn.setText(_("crystal_jump_field_active", "▶ Start Hop (Field Active)") if field_active else _("crystal_jump_start", "▶ Start Li Hop Animation"))
             self.jump_btn.setStyleSheet("background-color: #2ecc40; color: white; padding: 8px; font-weight: bold;")
             if not field_active:
-                QtWidgets.QMessageBox.information(self, "Informacija", "Nerastos gretimos Li–Vakansijos poros animacijai.")
+                QtWidgets.QMessageBox.information(self, _("msg_info", "Information"), _("crystal_no_pairs", "No adjacent Li-Vacancy pairs found for animation."))
             return
             
         self.jump_frame = 0
@@ -990,7 +991,7 @@ class CrystalViewerWidget(QtWidgets.QWidget):
 def main():
     app = QtWidgets.QApplication(sys.argv)
     window = QtWidgets.QMainWindow()
-    window.setWindowTitle("LLTO Perovskito 3D Kristalų Struktūra")
+    window.setWindowTitle(_("crystal_title", "LLTO Crystal Structure (3D)"))
     window.resize(1200, 800)
     
     viewer = CrystalViewerWidget()
